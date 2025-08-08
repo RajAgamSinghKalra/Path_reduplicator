@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+oracledb
+rapidfuzz
+scikit-learn
+numpy
+pandas
+sentence-transformers
