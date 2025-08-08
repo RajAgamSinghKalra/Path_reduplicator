@@ -3,7 +3,6 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from app.features import feature_row
 from app.db import get_conn
-from app.config import Config
 from app.model_store import save_model
 from app.normalization import canonical_identity_text
 from app.embeddings import embed_identity
@@ -20,7 +19,8 @@ def fetch_candidate_row(conn, customer_id, qvec):
     sql = """
     WITH q AS (SELECT qvec FROM query_identity WHERE qid = :qid)
     SELECT c.customer_id, VECTOR_DISTANCE(c.identity_vec, q.qvec) AS vdist,
-           c.full_name, c.dob, c.phone_e164, c.email_norm, c.gov_id_norm, c.city, c.state
+           c.full_name, c.dob, c.phone_e164, c.email_norm, c.gov_id_norm,
+           c.addr_line, c.city, c.state
     FROM customers c, q
     WHERE c.customer_id = :cid
     """

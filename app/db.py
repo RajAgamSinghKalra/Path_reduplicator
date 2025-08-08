@@ -31,7 +31,8 @@ def topk_by_vector(conn, query_vec, k):
     WITH q AS (SELECT qvec FROM query_identity WHERE qid = :qid)
     SELECT c.customer_id,
            VECTOR_DISTANCE(c.identity_vec, q.qvec) AS vdist,
-           c.full_name, c.dob, c.phone_e164, c.email_norm, c.gov_id_norm, c.city, c.state
+           c.full_name, c.dob, c.phone_e164, c.email_norm, c.gov_id_norm,
+           c.addr_line, c.city, c.state
     FROM customers c CROSS JOIN q
     ORDER BY vdist
     FETCH FIRST :k ROWS ONLY
