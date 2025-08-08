@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from app.deduper import check_duplicate
-from app.normalization import canonical_identity_text
+from app.normalization import canonical_identity_text, norm_phone_e164, norm_email, norm_govid
 from app.embeddings import embed_identity
 from app.db import get_conn
 from app.config import Config
@@ -27,9 +27,21 @@ def dedupe_check(cust: Customer):
 @app.post("/customers")
 def create_customer(cust: Customer):
     q = cust.dict()
+    normed = {
+        "full_name": q.get("full_name"),
+        "dob": q.get("dob"),
+        "phone_e164": norm_phone_e164(q.get("phone")),
+        "email_norm": norm_email(q.get("email")),
+        "gov_id_norm": norm_govid(q.get("gov_id")),
+        "addr_line": q.get("addr_line"),
+        "city": q.get("city"),
+        "state": q.get("state"),
+        "postal_code": q.get("postal_code"),
+        "country": q.get("country") or "IN",
+    }
     ident = canonical_identity_text(
-        q.get("full_name"), q.get("dob"), q.get("phone"), q.get("email"), q.get("gov_id"),
-        q.get("addr_line"), q.get("city"), q.get("state"), q.get("postal_code"), q.get("country")
+        normed["full_name"], normed["dob"], normed["phone_e164"], normed["email_norm"], normed["gov_id_norm"],
+        normed["addr_line"], normed["city"], normed["state"], normed["postal_code"], normed["country"]
     )
     vec = embed_identity(ident)
 
@@ -47,24 +59,21 @@ def create_customer(cust: Customer):
             :identity_text, :identity_vec
         )
         """
-        # Normalize fields similarly to check_duplicate (kept simple here)
-        bind = {
-            "full_name": q.get("full_name"),
-            "dob": q.get("dob"),
-            "phone_e164": q.get("phone"),
-            "email_norm": (q.get("email") or "").lower(),
-            "gov_id_norm": (q.get("gov_id") or "").upper(),
-            "addr_line": q.get("addr_line"),
-            "city": q.get("city"),
-            "state": q.get("state"),
-            "postal_code": q.get("postal_code"),
-            "country": q.get("country") or "IN",
-            "identity_text": ident,
-            "identity_vec": vec.tolist(),  # oracledb will still want array('f', ...); fallback below
-        }
-        # Safer bind for vector:
         import array
-        bind["identity_vec"] = array.array('f', vec)
+        bind = {
+            "full_name": normed["full_name"],
+            "dob": normed["dob"],
+            "phone_e164": normed["phone_e164"],
+            "email_norm": normed["email_norm"],
+            "gov_id_norm": normed["gov_id_norm"],
+            "addr_line": normed["addr_line"],
+            "city": normed["city"],
+            "state": normed["state"],
+            "postal_code": normed["postal_code"],
+            "country": normed["country"],
+            "identity_text": ident,
+            "identity_vec": array.array('f', vec),
+        }
 
         cur.execute(sql, bind)
         conn.commit()

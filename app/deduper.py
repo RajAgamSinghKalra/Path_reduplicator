@@ -1,5 +1,5 @@
 from .config import Config
-from .normalization import canonical_identity_text, norm_name, norm_email, norm_phone_e164, norm_govid
+from .normalization import canonical_identity_text, norm_email, norm_phone_e164, norm_govid
 from .embeddings import embed_identity
 from .db import get_conn, topk_by_vector
 from .features import feature_row
@@ -28,8 +28,9 @@ def candidate_dict(row):
         "phone_e164": row[4],
         "email_norm": row[5],
         "gov_id_norm": row[6],
-        "city": row[7],
-        "state": row[8],
+        "addr_line": row[7],
+        "city": row[8],
+        "state": row[9],
     }
 
 def check_duplicate(payload):
