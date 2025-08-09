@@ -49,6 +49,22 @@ def norm_phone_e164(s: str | None) -> str:
 def norm_govid(s: str | None) -> str:
     return (s or "").strip().upper()
 
+
+_PIN_RE = re.compile(r"^[1-9]\d{5}$")
+
+
+def norm_postal_code(s: str | None) -> str:
+    """Return a 6 digit Indian PIN code or ``""`` when invalid.
+
+    Whitespace is stripped and the code must match the ``XXNNNN`` format
+    (first digit non-zero followed by five digits).  Inputs not meeting these
+    criteria are treated as missing.
+    """
+    s = (s or "").strip().replace(" ", "")
+    if not s:
+        return ""
+    return s if _PIN_RE.fullmatch(s) else ""
+
 def canonical_identity_text(
     full_name: str | None,
     dob_iso: str | None,
@@ -70,7 +86,7 @@ def canonical_identity_text(
         f"addr:{(addr_line or '').lower()}",
         f"city:{(city or '').lower()}",
         f"state:{(state or '').lower()}",
-        f"pc:{(postal_code or '').lower()}",
+        f"pc:{norm_postal_code(postal_code)}",
         f"ctry:{(country or '').upper()}",
     ]
     return " | ".join(parts)

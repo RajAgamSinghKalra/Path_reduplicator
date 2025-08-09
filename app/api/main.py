@@ -1,7 +1,13 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from app.deduper import check_duplicate
-from app.normalization import canonical_identity_text, norm_phone_e164, norm_email, norm_govid
+from app.normalization import (
+    canonical_identity_text,
+    norm_phone_e164,
+    norm_email,
+    norm_govid,
+    norm_postal_code,
+)
 from app.embeddings import embed_identity
 from app.db import get_conn, to_vec_array
 
@@ -35,7 +41,7 @@ def create_customer(cust: Customer):
         "addr_line": q.get("addr_line"),
         "city": q.get("city"),
         "state": q.get("state"),
-        "postal_code": q.get("postal_code"),
+        "postal_code": norm_postal_code(q.get("postal_code")),
         "country": q.get("country") or "IN",
     }
     ident = canonical_identity_text(

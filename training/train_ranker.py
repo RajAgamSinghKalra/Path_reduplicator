@@ -4,7 +4,7 @@ from sklearn.linear_model import LogisticRegression
 from app.features import feature_row
 from app.db import get_conn
 from app.model_store import save_model
-from app.normalization import canonical_identity_text
+from app.normalization import canonical_identity_text, norm_postal_code
 from app.embeddings import embed_identity
 from app.deduper import candidate_dict
 from app.db import to_vec_array
@@ -44,7 +44,7 @@ def main(pairs_csv="labeled_pairs.csv"):
                 addr_line=r.get("query_addr"),
                 city=r.get("query_city"),
                 state=r.get("query_state"),
-                postal_code=r.get("query_pc"),
+                postal_code=norm_postal_code(r.get("query_pc")),
                 country=r.get("query_ctry"),
             )
             ident = canonical_identity_text(
