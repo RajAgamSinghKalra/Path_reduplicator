@@ -28,6 +28,31 @@ def addr_overlap(a, b):
         return 0.0
     return len(set_a & set_b) / len(set_a | set_b)
 
+
+def pincode_match(a, b):
+    """Exact match gives 1.0; first five digits match gives 0.5."""
+    a = (a or "").strip()
+    b = (b or "").strip()
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    if len(a) == 6 and len(b) == 6 and a[:5] == b[:5]:
+        return 0.5
+    return 0.0
+
+
+def dob_delta_days(a, b):
+    """Absolute difference in days between two ISO date strings."""
+    if not a or not b:
+        return 9999.0
+    from datetime import date
+    def to_date(x):
+        return x if isinstance(x, date) else date.fromisoformat(x)
+    da = to_date(a)
+    db = to_date(b)
+    return abs((da - db).days)
+
 def feature_row(query, candidate, vdist):
     """Generate feature vector for ranking."""
     vsim = 1.0 / (1.0 + vdist)  # distance to similarity-ish
@@ -40,4 +65,6 @@ def feature_row(query, candidate, vdist):
         addr_overlap(query.get("addr_line"), candidate.get("addr_line")),
         jw(query.get("city"), candidate.get("city")),
         jw(query.get("state"), candidate.get("state")),
+        pincode_match(query.get("postal_code"), candidate.get("postal_code")),
+        dob_delta_days(query.get("dob"), candidate.get("dob")),
     ]

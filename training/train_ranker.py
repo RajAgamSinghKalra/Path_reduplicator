@@ -20,7 +20,7 @@ def fetch_candidate_row(conn, customer_id, qvec):
     WITH q AS (SELECT qvec FROM query_identity WHERE qid = :qid)
     SELECT c.customer_id, VECTOR_DISTANCE(c.identity_vec, q.qvec) AS vdist,
            c.full_name, c.dob, c.phone_e164, c.email_norm, c.gov_id_norm,
-           c.addr_line, c.city, c.state
+           c.addr_line, c.city, c.state, c.postal_code
     FROM customers c, q
     WHERE c.customer_id = :cid
     """
