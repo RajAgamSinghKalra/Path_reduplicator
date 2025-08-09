@@ -44,8 +44,7 @@ def create_customer(cust: Customer):
     )
     vec = embed_identity(ident)
 
-    with get_conn() as conn:
-        cur = conn.cursor()
+    with get_conn() as conn, conn.cursor() as cur:
         sql = """
         INSERT INTO customers(
             full_name, dob, phone_e164, email_norm, gov_id_norm,
