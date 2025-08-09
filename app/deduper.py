@@ -31,6 +31,7 @@ def candidate_dict(row):
         "addr_line": row[7],
         "city": row[8],
         "state": row[9],
+        "postal_code": row[10],
     }
 
 def check_duplicate(payload):

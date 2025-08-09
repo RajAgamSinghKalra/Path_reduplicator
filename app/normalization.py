@@ -8,7 +8,20 @@ def norm_name(s: str) -> str:
     return s
 
 def norm_email(s: str) -> str:
-    return (s or "").strip().lower()
+    """Lowercase and apply provider-specific normalisation rules.
+
+    For Gmail/Googlemail addresses, dots in the local part are ignored and
+    anything after a plus sign is stripped.  Other providers simply get
+    lowercased and trimmed.
+    """
+    s = (s or "").strip().lower()
+    if not s:
+        return ""
+    local, sep, domain = s.partition("@")
+    if domain in ("gmail.com", "googlemail.com"):
+        local = local.split("+")[0]
+        local = local.replace(".", "")
+    return f"{local}{sep}{domain}"
 
 def norm_phone_e164(s: str) -> str:
     # Expect inputs like "+91..." or "91..." etc; normalize to +CC format where you can.
