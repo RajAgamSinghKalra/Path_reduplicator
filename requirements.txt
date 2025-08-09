@@ -7,3 +7,5 @@ scikit-learn
 numpy
 pandas
 sentence-transformers
+prometheus-client
+httpx

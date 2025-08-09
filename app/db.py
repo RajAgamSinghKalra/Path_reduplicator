@@ -1,16 +1,34 @@
 import array
 from typing import Sequence
+import threading
 
 import oracledb
 
 from .config import Config
 
+_pool = None
+_pool_lock = threading.Lock()
+
+def _get_pool() -> oracledb.SessionPool:
+    """Return a lazily constructed global session pool."""
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                _pool = oracledb.create_pool(
+                    user=Config.ORACLE_USER,
+                    password=Config.ORACLE_PASSWORD,
+                    dsn=Config.ORACLE_DSN,
+                    min=Config.POOL_MIN,
+                    max=Config.POOL_MAX,
+                    increment=Config.POOL_INC,
+                )
+    return _pool
+
 def get_conn() -> oracledb.Connection:
-    """Return a new Oracle database connection."""
-    # Thin mode defaults; use thick if you want.
-    return oracledb.connect(
-        user=Config.ORACLE_USER, password=Config.ORACLE_PASSWORD, dsn=Config.ORACLE_DSN
-    )
+    """Return a connection from the session pool."""
+    pool = _get_pool()
+    return pool.acquire()
 
 def to_vec_array(vec_f32: Sequence[float]) -> array.array:
     """Convert an iterable of float32 values to :class:`array.array`.
