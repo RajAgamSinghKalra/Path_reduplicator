@@ -3,6 +3,7 @@ import sys, pathlib
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 from app.features import (
+    jw,
     pincode_match,
     dob_delta_days,
     feature_row,
@@ -29,6 +30,11 @@ def test_exact_match_wrappers():
     assert phone_match('123', '456') == 0.0
     assert email_match('a@b', 'a@b') == 1.0
     assert govid_match('PAN', 'PAN') == 1.0
+
+
+def test_jw_similarity():
+    assert jw('Alice', 'alice') == 1.0
+    assert jw(None, 'alice') == 0.0
 
 
 def test_feature_row_length_and_values():
