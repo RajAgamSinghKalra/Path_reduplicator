@@ -3,8 +3,7 @@ from pydantic import BaseModel
 from app.deduper import check_duplicate
 from app.normalization import canonical_identity_text, norm_phone_e164, norm_email, norm_govid
 from app.embeddings import embed_identity
-from app.db import get_conn
-from app.config import Config
+from app.db import get_conn, to_vec_array
 
 app = FastAPI(title="Reduplicator (Oracle 23ai)")
 
@@ -59,7 +58,6 @@ def create_customer(cust: Customer):
             :identity_text, :identity_vec
         )
         """
-        import array
         bind = {
             "full_name": normed["full_name"],
             "dob": normed["dob"],
@@ -72,7 +70,7 @@ def create_customer(cust: Customer):
             "postal_code": normed["postal_code"],
             "country": normed["country"],
             "identity_text": ident,
-            "identity_vec": array.array('f', vec),
+            "identity_vec": to_vec_array(vec),
         }
 
         cur.execute(sql, bind)
