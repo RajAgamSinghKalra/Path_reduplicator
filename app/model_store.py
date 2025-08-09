@@ -11,11 +11,18 @@ from sklearn.dummy import DummyClassifier
 _DEFAULT = DummyClassifier(strategy="constant", constant=0)
 _DEFAULT.fit(np.zeros((1, 10)), [0])  # feature_row outputs 10 features
 
+# Cache loaded models keyed by path to avoid repeated disk I/O
+_CACHE: dict[str, object] = {}
+
 def load_model(path="model.bin"):
+    if path in _CACHE:
+        return _CACHE[path]
     if os.path.exists(path):
         with open(path, "rb") as f:
-            return pickle.load(f)
-    return _DEFAULT
+            _CACHE[path] = pickle.load(f)
+    else:
+        _CACHE[path] = _DEFAULT
+    return _CACHE[path]
 
 def save_model(model, path="model.bin"):
     with open(path, "wb") as f: pickle.dump(model, f)

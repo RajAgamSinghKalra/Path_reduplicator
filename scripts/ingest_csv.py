@@ -1,10 +1,9 @@
 import csv
 import argparse
-import array
 
 from app.normalization import canonical_identity_text, norm_phone_e164, norm_email, norm_govid
 from app.embeddings import embed_identity
-from app.db import get_conn
+from app.db import get_conn, to_vec_array
 
 
 def ingest_csv(path: str):
@@ -41,7 +40,7 @@ def ingest_csv(path: str):
                 normed["addr_line"], normed["city"], normed["state"], normed["postal_code"], normed["country"]
             )
             vec = embed_identity(ident)
-            bind = normed | {"identity_text": ident, "identity_vec": array.array('f', vec)}
+            bind = normed | {"identity_text": ident, "identity_vec": to_vec_array(vec)}
             cur.execute(sql, bind)
         conn.commit()
 
