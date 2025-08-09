@@ -7,13 +7,31 @@ def get_conn():
     return oracledb.connect(user=Config.ORACLE_USER, password=Config.ORACLE_PASSWORD, dsn=Config.ORACLE_DSN)
 
 def to_vec_array(vec_f32):
+    """Convert an iterable of float32 values to :class:`array.array`.
+
+    Oracle 23ai's driver can error (``DPY-3002``) when numpy arrays are
+    bound directly.  Converting to ``array('f', ...)`` avoids this but we
+    also validate the length so that mismatched embeddings are caught
+    early.
+
+    Parameters
+    ----------
+    vec_f32: iterable
+        Sequence of float32 values representing an embedding.
+
+    Returns
+    -------
+    array.array
+        Array of type ``'f'`` with length equal to ``Config.VECTOR_DIM``.
+
+    Raises
+    ------
+    ValueError
+        If ``vec_f32`` does not have ``Config.VECTOR_DIM`` elements.
     """
-    Oracle 23ai Free often fails if you bind numpy arrays directly.
-    Convert to array('f', ...) to avoid DPY-3002.
-    Ensure len == VECTOR_DIM.
-    """
-    a = array.array('f', vec_f32)  # float32
-    return a
+    if len(vec_f32) != Config.VECTOR_DIM:
+        raise ValueError(f"expected vector of length {Config.VECTOR_DIM}")
+    return array.array('f', vec_f32)  # float32
 
 def topk_by_vector(conn, query_vec, k):
     """
