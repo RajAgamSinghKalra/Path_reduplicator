@@ -1,5 +1,6 @@
 from rapidfuzz.distance import JaroWinkler
 
+
 def jw(a, b):
     a = (a or "").lower().strip()
     b = (b or "").lower().strip()
@@ -8,16 +9,21 @@ def jw(a, b):
     return JaroWinkler.similarity(a, b) / 100.0
 
 
-def phone_match(a, b):
+def exact_match(a, b):
+    """Return ``1.0`` when both values are non-empty and equal."""
     return 1.0 if a and b and a == b else 0.0
+
+
+def phone_match(a, b):
+    return exact_match(a, b)
 
 
 def email_match(a, b):
-    return 1.0 if a and b and a == b else 0.0
+    return exact_match(a, b)
 
 
 def govid_match(a, b):
-    return 1.0 if a and b and a == b else 0.0
+    return exact_match(a, b)
 
 
 def addr_overlap(a, b):

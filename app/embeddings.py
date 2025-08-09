@@ -1,14 +1,14 @@
 import numpy as np
+from functools import lru_cache
 from sentence_transformers import SentenceTransformer
+
 from .config import Config
 
-_model = None
 
-def get_model():
-    global _model
-    if _model is None:
-        _model = SentenceTransformer(Config.EMBED_MODEL)
-    return _model
+@lru_cache()
+def get_model() -> SentenceTransformer:
+    """Return a cached ``SentenceTransformer`` instance."""
+    return SentenceTransformer(Config.EMBED_MODEL)
 
 def embed_identity(text: str):
     """
