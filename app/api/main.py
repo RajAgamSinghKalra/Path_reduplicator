@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
 from app.deduper import check_duplicate
 from app.normalization import (
     canonical_identity_text,
@@ -10,6 +12,7 @@ from app.normalization import (
 )
 from app.embeddings import embed_identity
 from app.db import get_conn, to_vec_array
+from training.train_ranker import main as train_ranker
 
 app = FastAPI(title="Reduplicator (Oracle 23ai)")
 
@@ -24,6 +27,31 @@ class Customer(BaseModel):
     state: str | None = None
     postal_code: str | None = None
     country: str | None = "IN"
+
+class TrainRequest(BaseModel):
+    pairs_csv: str = "labeled_pairs.csv"
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
+@app.get("/readyz")
+def readyz():
+    try:
+        with get_conn():
+            pass
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="db unavailable") from exc
+    return {"status": "ok"}
+
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+@app.post("/train")
+def train(req: TrainRequest):
+    train_ranker(req.pairs_csv)
+    return {"status": "trained"}
 
 @app.post("/dedupe/check")
 def dedupe_check(cust: Customer):
