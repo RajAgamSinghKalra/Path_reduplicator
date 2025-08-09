@@ -1,7 +1,13 @@
 import csv
 import argparse
 
-from app.normalization import canonical_identity_text, norm_phone_e164, norm_email, norm_govid
+from app.normalization import (
+    canonical_identity_text,
+    norm_phone_e164,
+    norm_email,
+    norm_govid,
+    norm_postal_code,
+)
 from app.embeddings import embed_identity
 from app.db import get_conn, to_vec_array
 
@@ -32,7 +38,7 @@ def ingest_csv(path: str):
                 "addr_line": row.get("addr_line"),
                 "city": row.get("city"),
                 "state": row.get("state"),
-                "postal_code": row.get("postal_code"),
+                "postal_code": norm_postal_code(row.get("postal_code")),
                 "country": row.get("country") or "IN",
             }
             ident = canonical_identity_text(

@@ -1,5 +1,11 @@
 from .config import Config
-from .normalization import canonical_identity_text, norm_email, norm_phone_e164, norm_govid
+from .normalization import (
+    canonical_identity_text,
+    norm_email,
+    norm_phone_e164,
+    norm_govid,
+    norm_postal_code,
+)
 from .embeddings import embed_identity
 from .db import get_conn, topk_by_vector
 from .features import feature_row
@@ -15,7 +21,7 @@ def to_query_obj(payload):
         "addr_line": payload.get("addr_line"),
         "city": payload.get("city"),
         "state": payload.get("state"),
-        "postal_code": payload.get("postal_code"),
+        "postal_code": norm_postal_code(payload.get("postal_code")),
         "country": payload.get("country", "IN"),
     }
 
@@ -31,7 +37,7 @@ def candidate_dict(row):
         "addr_line": row[7],
         "city": row[8],
         "state": row[9],
-        "postal_code": row[10],
+        "postal_code": norm_postal_code(row[10]),
     }
 
 def check_duplicate(payload):
