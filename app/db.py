@@ -4,6 +4,18 @@ import threading
 
 import oracledb
 
+# Attempt to initialize the Oracle client in thick mode if available.  If the
+# specified client libraries are not present or the initialization fails for
+# any reason, we fall back to the default thin mode.  This must happen before
+# any connections or pools are created.
+try:  # pragma: no cover - depends on client availability at runtime
+    oracledb.init_oracle_client(
+        lib_dir=r"C:\Users\Agam\Downloads\intern\pathinfotech\face\oracle23ai\dbhomeFree\bin"
+    )
+    print("Thick mode enabled")
+except Exception:  # pragma: no cover - executed when thick mode fails
+    print("Falling back to thin mode")
+
 from .config import Config
 
 _pool = None
