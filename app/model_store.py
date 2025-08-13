@@ -1,4 +1,5 @@
-import os, pickle
+import os
+import pickle
 import numpy as np
 from sklearn.dummy import DummyClassifier
 
@@ -25,7 +26,8 @@ def load_model(path="model.bin"):
     return _CACHE[path]
 
 def save_model(model, path="model.bin"):
-    with open(path, "wb") as f: pickle.dump(model, f)
+    with open(path, "wb") as f:
+        pickle.dump(model, f)
 
 def predict_proba(model, X):
     """Predict probability of the positive class.
