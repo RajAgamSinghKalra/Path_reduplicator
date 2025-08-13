@@ -27,7 +27,7 @@ been seen in our system?" and is tuned for KYC/loan workflows.
    sqlplus users/YOURPASS@localhost/XEPDB1 @sql/02_indexes.sql
    ```
 
-2. **Install & run** the API:
+2. **Install & run the backend API**:
 
    ```bash
    python -m venv .venv && . .venv/bin/activate
@@ -35,13 +35,24 @@ been seen in our system?" and is tuned for KYC/loan workflows.
    uvicorn app.api.main:app --host 0.0.0.0 --port 8000
    ```
 
-3. **Ingest customers** individually with HTTP or in bulk from CSV:
+3. **Start the frontend** (Node 18+):
+
+   ```bash
+   cd frontend
+   pnpm install     # or npm install
+   pnpm dev         # serves http://localhost:3000
+   ```
+
+   Set `NEXT_PUBLIC_API_BASE_URL` if the backend is not on `localhost:8000`,
+   then open <http://localhost:3000> to access the web UI.
+
+4. **Ingest customers** individually with HTTP or in bulk from CSV:
 
    ```bash
    python scripts/ingest_csv.py customers.csv
    ```
 
-4. **Check a duplicate**:
+5. **Check a duplicate** via API or the web UI:
 
    ```bash
    curl -X POST http://localhost:8000/dedupe/check \
@@ -49,11 +60,23 @@ been seen in our system?" and is tuned for KYC/loan workflows.
         -d '{"full_name":"Rohan K.","dob":"1995-11-20","phone":"+91-9876543210"}'
    ```
 
-5. **Train the ranker** once you have labelled pairs:
+6. **Train the ranker** once you have labelled pairs:
 
    ```bash
    python training/train_ranker.py --pairs_csv labeled_pairs.csv
    ```
+
+## Using the application
+
+With the backend and frontend running, visit <http://localhost:3000> to:
+
+* Add customers
+* Run duplicate checks
+* Onboard applicants
+* Retrain the ranker
+
+The `curl` example above shows how to call the API directly if you prefer
+automation or scripting.
 
 ## Scripts
 
