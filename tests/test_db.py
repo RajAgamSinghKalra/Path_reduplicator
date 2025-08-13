@@ -1,4 +1,6 @@
-import sys, pathlib, array
+import sys
+import pathlib
+import array
 
 import pytest
 
