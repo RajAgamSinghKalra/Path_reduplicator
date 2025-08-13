@@ -4,8 +4,8 @@ python-dotenv
 oracledb
 rapidfuzz
 scikit-learn
-numpy
-pandas
+numpy>=1.26,<2
+pandas<2.3
 sentence-transformers
 prometheus-client
 httpx
