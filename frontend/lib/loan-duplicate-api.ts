@@ -31,15 +31,6 @@ export interface LoanCandidateMatch {
   postal_code: string
   score: number
   vector_distance: number
-  // Enhanced loan information
-  existing_account_id?: string
-  existing_loan_ids?: string[]
-  loan_history?: {
-    loan_type: string
-    amount: number
-    status: string
-    date: string
-  }[]
 }
 
 export interface LoanDuplicateCheckResponse {

@@ -149,61 +149,28 @@ export function LoanDuplicateResults({ results }: LoanDuplicateResultsProps) {
                 </div>
               </div>
 
-              {/* Loan Information */}
-              <div className="space-y-3">
-                <h4 className="font-medium text-primary flex items-center gap-2">
-                  <CreditCard className="h-4 w-4" />
-                  Banking Details
-                </h4>
-                <div className="space-y-2 text-sm">
-                  {results.best_match.existing_account_id && (
+                {/* Match Details */}
+                <div className="space-y-3">
+                  <h4 className="font-medium text-primary flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    Match Details
+                  </h4>
+                  <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Account ID:</span>
-                      <span className="font-medium">{results.best_match.existing_account_id}</span>
+                      <span className="text-muted-foreground">Match Score:</span>
+                      <Badge
+                        variant="outline"
+                        className={results.best_match.score >= results.threshold ? "border-accent text-accent" : ""}
+                      >
+                        {(results.best_match.score * 100).toFixed(1)}%
+                      </Badge>
                     </div>
-                  )}
-                  {results.best_match.existing_loan_ids && results.best_match.existing_loan_ids.length > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Loan IDs:</span>
-                      <span className="font-medium">{results.best_match.existing_loan_ids.join(", ")}</span>
+                      <span className="text-muted-foreground">Vector Distance:</span>
+                      <span className="font-mono text-sm">{results.best_match.vector_distance.toFixed(4)}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Match Score:</span>
-                    <Badge
-                      variant="outline"
-                      className={results.best_match.score >= results.threshold ? "border-accent text-accent" : ""}
-                    >
-                      {(results.best_match.score * 100).toFixed(1)}%
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Vector Distance:</span>
-                    <span className="font-mono text-sm">{results.best_match.vector_distance.toFixed(4)}</span>
                   </div>
                 </div>
-
-                {/* Loan History */}
-                {results.best_match.loan_history && results.best_match.loan_history.length > 0 && (
-                  <div className="mt-4">
-                    <h5 className="font-medium text-sm mb-2">Recent Loan History</h5>
-                    {results.best_match.loan_history.map((loan, index) => (
-                      <div key={index} className="bg-muted/50 p-2 rounded text-xs space-y-1">
-                        <div className="flex justify-between">
-                          <span>{loan.loan_type}</span>
-                          <Badge variant="outline" size="sm">
-                            {loan.status}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>₹{loan.amount.toLocaleString()}</span>
-                          <span>{loan.date}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Address Information */}
@@ -276,7 +243,6 @@ export function LoanDuplicateResults({ results }: LoanDuplicateResultsProps) {
                       Phone {sortField === "phone" && (sortDirection === "asc" ? "↑" : "↓")}
                     </Button>
                   </TableHead>
-                  <TableHead>Account</TableHead>
                   <TableHead>
                     <Button
                       variant="ghost"
@@ -309,13 +275,6 @@ export function LoanDuplicateResults({ results }: LoanDuplicateResultsProps) {
                           <TableCell>{candidate.date_of_birth}</TableCell>
                           <TableCell>{candidate.phone}</TableCell>
                           <TableCell>
-                            {candidate.existing_account_id ? (
-                              <span className="text-xs font-mono">{candidate.existing_account_id}</span>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">None</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
                             <Badge
                               variant="outline"
                               className={
@@ -331,7 +290,7 @@ export function LoanDuplicateResults({ results }: LoanDuplicateResultsProps) {
                       </CollapsibleTrigger>
                       <CollapsibleContent asChild>
                         <TableRow>
-                          <TableCell colSpan={6} className="bg-muted/20">
+                          <TableCell colSpan={5} className="bg-muted/20">
                             <div className="p-4 space-y-4">
                               <div className="grid gap-4 md:grid-cols-2">
                                 {/* Identity & Address */}
@@ -366,44 +325,19 @@ export function LoanDuplicateResults({ results }: LoanDuplicateResultsProps) {
                                   </div>
                                 </div>
 
-                                {/* Banking & Loan Info */}
-                                <div>
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <CreditCard className="h-4 w-4 text-muted-foreground" />
-                                    <span className="font-medium text-sm">Banking Information</span>
-                                  </div>
-                                  <div className="grid gap-1 text-xs">
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Vector Distance:</span>
-                                      <span className="font-mono">{candidate.vector_distance.toFixed(4)}</span>
+                                  {/* Match Details */}
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                                      <span className="font-medium text-sm">Match Details</span>
                                     </div>
-                                    {candidate.existing_loan_ids && candidate.existing_loan_ids.length > 0 && (
+                                    <div className="grid gap-1 text-xs">
                                       <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Loan IDs:</span>
-                                        <span>{candidate.existing_loan_ids.join(", ")}</span>
+                                        <span className="text-muted-foreground">Vector Distance:</span>
+                                        <span className="font-mono">{candidate.vector_distance.toFixed(4)}</span>
                                       </div>
-                                    )}
-                                    {candidate.loan_history && candidate.loan_history.length > 0 && (
-                                      <div className="mt-2">
-                                        <span className="text-muted-foreground text-xs">Recent Loans:</span>
-                                        {candidate.loan_history.map((loan, index) => (
-                                          <div key={index} className="bg-muted/50 p-1 rounded mt-1">
-                                            <div className="flex justify-between">
-                                              <span>{loan.loan_type}</span>
-                                              <Badge variant="outline" size="sm">
-                                                {loan.status}
-                                              </Badge>
-                                            </div>
-                                            <div className="flex justify-between text-muted-foreground">
-                                              <span>₹{loan.amount.toLocaleString()}</span>
-                                              <span>{loan.date}</span>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
+                                    </div>
                                   </div>
-                                </div>
                               </div>
                             </div>
                           </TableCell>
