@@ -9,3 +9,5 @@ pandas
 sentence-transformers
 prometheus-client
 httpx
+datasets
+pyarrow

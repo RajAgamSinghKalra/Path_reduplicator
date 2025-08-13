@@ -14,13 +14,15 @@ def test_healthz():
 
 def test_train_endpoint(monkeypatch):
     called = {}
-    def fake_train(csv_path):
-        called["csv"] = csv_path
+
+    def fake_train(path):
+        called["path"] = path
+
     monkeypatch.setattr(main, "train_ranker", fake_train)
-    resp = client.post("/train", json={"pairs_csv": "foo.csv"})
+    resp = client.post("/train", json={"csv_path": "foo.csv"})
     assert resp.status_code == 200
     assert resp.json()["status"] == "trained"
-    assert called["csv"] == "foo.csv"
+    assert called["path"] == "foo.csv"
 
 
 def test_dedupe_field_aliases(monkeypatch):

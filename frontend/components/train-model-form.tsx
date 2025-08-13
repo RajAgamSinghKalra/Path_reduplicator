@@ -20,7 +20,7 @@ interface TrainingStatus {
 }
 
 export function TrainModelForm() {
-  const [csvPath, setCsvPath] = useState("labeled_pairs.csv")
+  const [dataPath, setDataPath] = useState("labeled_pairs.csv")
   const [trainingStatus, setTrainingStatus] = useState<TrainingStatus>({
     isTraining: false,
     progress: 0,
@@ -60,10 +60,10 @@ export function TrainModelForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!csvPath.trim()) {
+    if (!dataPath.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please provide a CSV file path",
+        description: "Please provide a data file path",
         variant: "destructive",
       })
       return
@@ -81,7 +81,7 @@ export function TrainModelForm() {
 
     try {
       const request: TrainModelRequest = {
-        csv_path: csvPath,
+        data_path: dataPath,
       }
 
       const result = await trainModel(request)
@@ -154,17 +154,17 @@ export function TrainModelForm() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* CSV Path Input */}
             <div className="space-y-2">
-              <Label htmlFor="csv_path">Training Data CSV Path</Label>
+              <Label htmlFor="data_path">Training Data Path</Label>
               <Input
-                id="csv_path"
-                value={csvPath}
-                onChange={(e) => setCsvPath(e.target.value)}
+                id="data_path"
+                value={dataPath}
+                onChange={(e) => setDataPath(e.target.value)}
                 placeholder="labeled_pairs.csv"
                 disabled={trainingStatus.isTraining}
                 className="font-mono"
               />
               <p className="text-sm text-muted-foreground">
-                Path to the CSV file containing labeled loan applicant pairs for training the duplicate detection model
+                Path to the data file (CSV, Parquet, or Hugging Face dataset directory) containing labeled loan applicant pairs for training the duplicate detection model
               </p>
             </div>
 

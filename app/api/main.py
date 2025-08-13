@@ -32,7 +32,9 @@ class Customer(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 class TrainRequest(BaseModel):
-    pairs_csv: str = "labeled_pairs.csv"
+    data_path: str = Field("labeled_pairs.csv", alias="csv_path")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 @app.get("/healthz")
 def healthz():
@@ -53,7 +55,7 @@ def metrics():
 
 @app.post("/train")
 def train(req: TrainRequest):
-    train_ranker(req.pairs_csv)
+    train_ranker(req.data_path)
     return {"status": "trained"}
 
 @app.post("/dedupe/check")

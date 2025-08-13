@@ -1,7 +1,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
 
 export interface TrainModelRequest {
-  csv_path: string
+  data_path: string
 }
 
 export interface TrainModelResponse {
@@ -29,7 +29,7 @@ export async function trainModel(request: TrainModelRequest): Promise<TrainModel
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify({ csv_path: request.data_path }),
     })
 
     const data = await response.json()

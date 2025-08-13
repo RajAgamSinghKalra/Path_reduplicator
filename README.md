@@ -63,9 +63,11 @@ been seen in our system?" and is tuned for KYC/loan workflows.
 6. **Train the ranker** once you have labelled pairs:
 
    ```bash
-   python training/train_ranker.py --pairs_csv labeled_pairs.csv
+   python training/train_ranker.py path/to/labeled_pairs
    ```
 
+   The path may reference a CSV file, a Parquet file, or a directory containing
+   a Hugging Face dataset saved with ``datasets.save_to_disk``.
 ## Using the application
 
 With the backend and frontend running, visit <http://localhost:3000> to:
@@ -80,7 +82,8 @@ automation or scripting.
 
 ## Scripts
 
-* `scripts/ingest_csv.py` – ingest customers from a CSV file.
+* `scripts/ingest_csv.py` – ingest customers from a CSV/Parquet file or a
+  directory of Parquet shards.
 * `scripts/smoke_check.py` – run `check_duplicate` against a JSON payload.
 
 ## Environment

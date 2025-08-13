@@ -1,4 +1,3 @@
-import csv
 import argparse
 
 from app.normalization import (
@@ -10,11 +9,12 @@ from app.normalization import (
 )
 from app.embeddings import embed_identity
 from app.db import get_conn, to_vec_array
+from training.data_loader import load_dataframe
 
 
-def ingest_csv(path: str):
-    with open(path, newline='', encoding='utf-8') as f, get_conn() as conn:
-        reader = csv.DictReader(f)
+def ingest_data(path: str):
+    df = load_dataframe(path)
+    with get_conn() as conn:
         cur = conn.cursor()
         sql = """
         INSERT INTO customers(
@@ -28,7 +28,7 @@ def ingest_csv(path: str):
             :identity_text, :identity_vec
         )
         """
-        for row in reader:
+        for _, row in df.iterrows():
             normed = {
                 "full_name": row.get("full_name"),
                 "dob": row.get("dob"),
@@ -52,7 +52,7 @@ def ingest_csv(path: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Ingest customers from CSV")
-    parser.add_argument("csv_path", help="Path to CSV file")
+    parser = argparse.ArgumentParser(description="Ingest customers from a dataset file")
+    parser.add_argument("data_path", help="Path to CSV/Parquet file or dataset directory")
     args = parser.parse_args()
-    ingest_csv(args.csv_path)
+    ingest_data(args.data_path)
