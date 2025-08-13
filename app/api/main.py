@@ -53,6 +53,54 @@ def readyz():
 def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
+
+@app.get("/stats")
+def stats():
+    """Return basic applicant metrics derived from the database."""
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM customers")
+        total = cur.fetchone()[0] or 0
+
+        cur.execute(
+            "SELECT COUNT(*) FROM customers WHERE TRUNC(created_at) = TRUNC(SYSDATE)"
+        )
+        today = cur.fetchone()[0] or 0
+
+        cur.execute(
+            """
+            SELECT COUNT(*) FROM (
+                SELECT gov_id_norm, COUNT(*) c
+                FROM customers
+                WHERE gov_id_norm IS NOT NULL
+                GROUP BY gov_id_norm
+                HAVING COUNT(*) > 1
+            )
+            """
+        )
+        dup = cur.fetchone()[0] or 0
+
+        cur.execute(
+            """
+            SELECT COUNT(*) FROM (
+                SELECT gov_id_norm, COUNT(*) c
+                FROM customers
+                WHERE gov_id_norm IS NOT NULL
+                GROUP BY gov_id_norm
+                HAVING COUNT(*) >= 5
+            )
+            """
+        )
+        high_risk = cur.fetchone()[0] or 0
+
+    rate = round((today / total) * 100, 1) if total else 0.0
+    return {
+        "total_applicants": total,
+        "today_applicants": today,
+        "duplicate_alerts": dup,
+        "high_risk_duplicates": high_risk,
+        "processing_rate": rate,
+    }
+
 @app.post("/train")
 def train(req: TrainRequest):
     train_ranker(req.data_path)

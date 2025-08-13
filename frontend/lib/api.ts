@@ -68,6 +68,27 @@ export async function checkReadiness(): Promise<HealthStatus> {
   }
 }
 
+export interface Stats {
+  total_applicants: number
+  today_applicants: number
+  duplicate_alerts: number
+  high_risk_duplicates: number
+  processing_rate: number
+}
+
+export async function getStats(): Promise<Stats> {
+  const response = await fetch(`${API_BASE_URL}/stats`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  })
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+  return response.json()
+}
+
 export function getMetricsUrl(): string {
   return `${API_BASE_URL}/metrics`
 }
