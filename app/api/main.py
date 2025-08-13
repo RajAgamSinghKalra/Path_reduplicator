@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.deduper import check_duplicate
@@ -12,21 +12,24 @@ from app.normalization import (
 )
 from app.embeddings import embed_identity
 from app.db import get_conn, to_vec_array
+from app.config import Config
 from training.train_ranker import main as train_ranker
 
 app = FastAPI(title="Reduplicator (Oracle 23ai)")
 
 class Customer(BaseModel):
     full_name: str
-    dob: str | None = None
+    dob: str | None = Field(None, alias="date_of_birth")
     phone: str | None = None
     email: str | None = None
-    gov_id: str | None = None
-    addr_line: str | None = None
+    gov_id: str | None = Field(None, alias="government_id")
+    addr_line: str | None = Field(None, alias="address_line")
     city: str | None = None
     state: str | None = None
     postal_code: str | None = None
     country: str | None = "IN"
+
+    model_config = ConfigDict(populate_by_name=True)
 
 class TrainRequest(BaseModel):
     pairs_csv: str = "labeled_pairs.csv"
@@ -55,11 +58,37 @@ def train(req: TrainRequest):
 
 @app.post("/dedupe/check")
 def dedupe_check(cust: Customer):
-    return check_duplicate(cust.dict())
+    result = check_duplicate(cust.model_dump())
+
+    def rename(c):
+        return {
+            "customer_id": c.get("customer_id"),
+            "name": c.get("full_name"),
+            "date_of_birth": c.get("dob"),
+            "phone": c.get("phone_e164"),
+            "email": c.get("email_norm"),
+            "government_id": c.get("gov_id_norm"),
+            "address_line": c.get("addr_line"),
+            "city": c.get("city"),
+            "state": c.get("state"),
+            "postal_code": c.get("postal_code"),
+            "score": c.get("score"),
+            "vector_distance": c.get("vdist"),
+        }
+
+    best = result.get("best_match")
+    candidates = [rename(c) for c in result.get("candidates", [])]
+    return {
+        "is_duplicate": result.get("is_duplicate", False),
+        "score": result.get("score", 0.0),
+        "threshold": Config.THRESHOLD,
+        "best_match": rename(best) if best else None,
+        "candidates": candidates,
+    }
 
 @app.post("/customers")
 def create_customer(cust: Customer):
-    q = cust.dict()
+    q = cust.model_dump()
     normed = {
         "full_name": q.get("full_name"),
         "dob": q.get("dob"),
