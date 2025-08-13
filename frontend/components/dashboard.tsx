@@ -6,8 +6,23 @@ import { Button } from "@/components/ui/button"
 import { StatusCard } from "./status-card"
 import { AnimatedContainer } from "./animated-container"
 import { LoadingSpinner } from "./loading-spinner"
-import { checkHealth, checkReadiness, getMetricsUrl, type HealthStatus } from "@/lib/api"
+import {
+  checkHealth,
+  checkReadiness,
+  getMetricsUrl,
+  getStats,
+  type HealthStatus,
+} from "@/lib/api"
 import { ExternalLink, RefreshCw, Activity, Users, AlertTriangle, TrendingUp, Building2 } from "lucide-react"
+
+interface LoanMetrics {
+  totalApplicants: number
+  todayApplicants: number
+  duplicateAlerts: number
+  highRiskDuplicates: number
+  processingRate: number
+  lastUpdated: string
+}
 
 export function Dashboard() {
   const [healthStatus, setHealthStatus] = useState<HealthStatus>({
@@ -20,21 +35,33 @@ export function Dashboard() {
   })
   const [isLoading, setIsLoading] = useState(false)
 
-  const [loanMetrics] = useState({
-    totalApplicants: 1247,
-    todayApplicants: 23,
-    duplicateAlerts: 8,
-    highRiskDuplicates: 3,
-    processingRate: 94.2,
-    lastUpdated: new Date().toLocaleString(),
+  const [loanMetrics, setLoanMetrics] = useState<LoanMetrics>({
+    totalApplicants: 0,
+    todayApplicants: 0,
+    duplicateAlerts: 0,
+    highRiskDuplicates: 0,
+    processingRate: 0,
+    lastUpdated: "",
   })
 
   const checkStatuses = async () => {
     setIsLoading(true)
     try {
-      const [health, readiness] = await Promise.all([checkHealth(), checkReadiness()])
+      const [health, readiness, stats] = await Promise.all([
+        checkHealth(),
+        checkReadiness(),
+        getStats(),
+      ])
       setHealthStatus(health)
       setReadinessStatus(readiness)
+      setLoanMetrics({
+        totalApplicants: stats.total_applicants,
+        todayApplicants: stats.today_applicants,
+        duplicateAlerts: stats.duplicate_alerts,
+        highRiskDuplicates: stats.high_risk_duplicates,
+        processingRate: stats.processing_rate,
+        lastUpdated: new Date().toLocaleString(),
+      })
     } catch (error) {
       console.error("Error checking statuses:", error)
     } finally {

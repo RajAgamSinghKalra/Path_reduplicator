@@ -87,49 +87,12 @@ export const checkLoanDuplicate = async (formData: LoanDuplicateCheckRequest): P
       throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
     }
 
-    const data = await response.json()
-
-    // Enhance response with mock loan data for demonstration
-    const enhancedData: LoanDuplicateCheckResponse = {
-      ...data,
-      candidates:
-        data.candidates?.map((candidate: any) => ({
-          ...candidate,
-          existing_account_id: Math.random() > 0.5 ? `ACC${Math.floor(Math.random() * 100000)}` : undefined,
-          existing_loan_ids: Math.random() > 0.7 ? [`LN${Math.floor(Math.random() * 100000)}`] : [],
-          loan_history:
-            Math.random() > 0.6
-              ? [
-                  {
-                    loan_type: ["Personal Loan", "Home Loan", "Car Loan"][Math.floor(Math.random() * 3)],
-                    amount: Math.floor(Math.random() * 1000000) + 100000,
-                    status: ["Active", "Closed", "Defaulted"][Math.floor(Math.random() * 3)],
-                    date: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-                  },
-                ]
-              : [],
-        })) || [],
-      best_match: data.best_match
-        ? {
-            ...data.best_match,
-            existing_account_id: `ACC${Math.floor(Math.random() * 100000)}`,
-            existing_loan_ids: [`LN${Math.floor(Math.random() * 100000)}`],
-            loan_history: [
-              {
-                loan_type: "Home Loan",
-                amount: 2500000,
-                status: "Active",
-                date: "2023-06-15",
-              },
-            ],
-          }
-        : null,
-    }
+    const data: LoanDuplicateCheckResponse = await response.json()
 
     return {
       success: true,
       message: "Duplicate check completed successfully",
-      data: enhancedData,
+      data,
     }
   } catch (error) {
     console.error("Error checking for duplicates:", error)
