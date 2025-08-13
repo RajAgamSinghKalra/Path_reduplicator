@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from app.features import feature_row
@@ -8,6 +7,7 @@ from app.normalization import canonical_identity_text, norm_postal_code
 from app.embeddings import embed_identity
 from app.deduper import candidate_dict
 from app.db import to_vec_array
+from training.data_loader import load_dataframe
 
 def fetch_candidate_row(conn, customer_id, qvec):
     # Single candidate's vdist against qvec
@@ -30,8 +30,8 @@ def fetch_candidate_row(conn, customer_id, qvec):
     conn.commit()
     return candidate_dict(row)
 
-def main(pairs_csv="labeled_pairs.csv"):
-    df = pd.read_csv(pairs_csv)
+def main(pairs_path: str = "labeled_pairs.csv"):
+    df = load_dataframe(pairs_path)
     X, y = [], []
     with get_conn() as conn:
         for _, r in df.iterrows():
@@ -61,4 +61,14 @@ def main(pairs_csv="labeled_pairs.csv"):
     print("Saved model.bin")
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Train the duplicate detection ranker")
+    parser.add_argument(
+        "pairs_path",
+        nargs="?",
+        default="labeled_pairs.csv",
+        help="Path to CSV/Parquet file or Hugging Face dataset directory",
+    )
+    args = parser.parse_args()
+    main(args.pairs_path)
