@@ -4,11 +4,18 @@ from sentence_transformers import SentenceTransformer
 
 from .config import Config
 
+try:  # Prefer DirectML for GPU acceleration when available
+    import torch_directml
+
+    _DEVICE = torch_directml.device()
+except Exception:  # pragma: no cover - fallback to CPU if DirectML unavailable
+    _DEVICE = "cpu"
+
 
 @lru_cache()
 def get_model() -> SentenceTransformer:
     """Return a cached ``SentenceTransformer`` instance."""
-    return SentenceTransformer(Config.EMBED_MODEL)
+    return SentenceTransformer(Config.EMBED_MODEL, device=_DEVICE)
 
 def embed_identity(text: str):
     """

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
@@ -16,6 +17,13 @@ from app.config import Config
 from training.train_ranker import main as train_ranker
 
 app = FastAPI(title="Reduplicator (Oracle 23ai)")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class Customer(BaseModel):
     full_name: str
@@ -103,8 +111,8 @@ def stats():
 
 @app.post("/train")
 def train(req: TrainRequest):
-    train_ranker(req.data_path)
-    return {"status": "trained"}
+    result = train_ranker(req.data_path)
+    return result
 
 @app.post("/dedupe/check")
 def dedupe_check(cust: Customer):
