@@ -18,11 +18,12 @@ def test_train_endpoint(monkeypatch):
 
     def fake_train(path):
         called["path"] = path
+        return {"success": True, "message": "ok"}
 
     monkeypatch.setattr(main, "train_ranker", fake_train)
     resp = client.post("/train", json={"csv_path": "foo.csv"})
     assert resp.status_code == 200
-    assert resp.json()["status"] == "trained"
+    assert resp.json()["success"] is True
     assert called["path"] == "foo.csv"
 
 

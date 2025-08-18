@@ -37,7 +37,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${montserrat.variable} ${openSans.variable} antialiased`}>
-      <body className="font-open-sans transition-colors duration-300">
+      <body
+        className="font-open-sans transition-colors duration-300"
+        suppressHydrationWarning
+      >
         {/* Wrapped children in ThemeProvider */}
         <ThemeProvider>{children}</ThemeProvider>
       </body>

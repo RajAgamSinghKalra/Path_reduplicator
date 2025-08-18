@@ -1,3 +1,5 @@
+import time
+import uuid
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from app.features import feature_row
@@ -31,6 +33,7 @@ def fetch_candidate_row(conn, customer_id, qvec):
     return candidate_dict(row)
 
 def main(pairs_path: str = "labeled_pairs.csv"):
+    start = time.time()
     df = load_dataframe(pairs_path)
     X, y = [], []
     with get_conn() as conn:
@@ -55,10 +58,25 @@ def main(pairs_path: str = "labeled_pairs.csv"):
             cand = fetch_candidate_row(conn, int(r["cand_customer_id"]), qvec)
             X.append(feature_row(q, cand, cand["vdist"]))
             y.append(int(r["label"]))
+    X_arr = np.asarray(X)
+    y_arr = np.asarray(y)
     model = LogisticRegression(max_iter=1000, class_weight="balanced")
-    model.fit(np.asarray(X), np.asarray(y))
+    model.fit(X_arr, y_arr)
     save_model(model)
+    duration = time.time() - start
+    accuracy = float(model.score(X_arr, y_arr))
+    info = {
+        "success": True,
+        "message": "Model trained successfully",
+        "training_id": uuid.uuid4().hex[:8],
+        "details": {
+            "pairs_processed": len(df),
+            "accuracy": accuracy,
+            "training_time": duration,
+        },
+    }
     print("Saved model.bin")
+    return info
 
 if __name__ == "__main__":
     import argparse
