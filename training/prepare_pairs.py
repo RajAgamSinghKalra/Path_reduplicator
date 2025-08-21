@@ -104,6 +104,17 @@ def main(output_path: str = "labeled_pairs.csv") -> None:
             FROM USERS.CUSTOMERS
         """
         df = pd.read_sql(sql, conn)
+        # Oracle returns LOB objects for ``CLOB`` columns which are not directly
+        # comparable and cause ``groupby`` to fail with ``TypeError: '<'
+        # not supported between instances of 'LOB' and 'LOB'``.  Convert any
+        # value with a ``read`` attribute (as exposed by ``oracledb.LOB``) to a
+        # plain string so pandas can safely factorize and group on them.  ``DataFrame.map``
+        # is preferred but fall back to ``applymap`` for older pandas versions.
+        try:
+            df = df.map(lambda x: x.read() if hasattr(x, "read") else x)
+        except AttributeError:  # pragma: no cover - pandas < 2.1
+            df = df.applymap(lambda x: x.read() if hasattr(x, "read") else x)
+
         # Oracle returns column names in uppercase by default which causes key
         # lookups like ``row["customer_id"]`` to fail.  Normalize the columns to
         # lowercase so the rest of the code can consistently reference them.
