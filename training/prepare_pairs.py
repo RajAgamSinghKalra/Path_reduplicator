@@ -104,6 +104,12 @@ def main(output_path: str = "labeled_pairs.csv") -> None:
             FROM USERS.CUSTOMERS
         """
         df = pd.read_sql(sql, conn)
+        # Oracle returns column names in uppercase by default which causes key
+        # lookups like ``row["customer_id"]`` to fail.  Normalize the columns to
+        # lowercase so the rest of the code can consistently reference them.
+        df.columns = df.columns.str.lower()
+        if "customer_id" not in df.columns:
+            raise KeyError("customer_id column is missing from USERS.CUSTOMERS")
         if "identity_text" not in df.columns:
             def _ident_text(row: pd.Series) -> str:
                 dob = row.get("dob")
