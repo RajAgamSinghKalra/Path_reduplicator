@@ -40,6 +40,7 @@ if str(ROOT) not in sys.path:
 from app.db import get_conn, topk_by_vector
 from app.normalization import canonical_identity_text
 from app.embeddings import embed_identity, embed_identities
+import tempfile
 
 
 def _row_to_query(row: Mapping[str, object]) -> dict[str, object]:
@@ -57,13 +58,15 @@ def _row_to_query(row: Mapping[str, object]) -> dict[str, object]:
     return {
         "query_full_name": row.get("full_name"),
         "query_dob": dob,
-        "query_phone": row.get("phone_e164"),
+        "query_phone":
+            str(row.get("phone_e164")) if row.get("phone_e164") is not None else None,
         "query_email": row.get("email_norm"),
         "query_gov_id": row.get("gov_id_norm"),
         "query_addr": row.get("addr_line"),
         "query_city": row.get("city"),
         "query_state": row.get("state"),
-        "query_pc": row.get("postal_code"),
+        "query_pc":
+            str(row.get("postal_code")) if row.get("postal_code") is not None else None,
         "query_ctry": row.get("country"),
     }
 
@@ -129,6 +132,38 @@ def _hard_negative(
         if cid not in exclude_ids:
             return cid
     return None
+
+
+def generate_pairs_df(
+    *,
+    input_path: str | None = None,
+    max_pos_per_query: int | None = 5,
+    workers: int | None = None,
+) -> pd.DataFrame:
+    """Return a dataframe of query/candidate pairs for training.
+
+    This convenience wrapper runs :func:`main` using a temporary file and
+    returns the resulting data as a :class:`pandas.DataFrame`.
+
+    Parameters are identical to :func:`main` except ``output_path`` which is
+    handled internally.
+    """
+
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        main(
+            tmp_path,
+            input_path=input_path,
+            max_pos_per_query=max_pos_per_query,
+            workers=workers,
+        )
+        return pd.read_csv(tmp_path, dtype=str)
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
 
 
 def main(
