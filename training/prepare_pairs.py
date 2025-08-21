@@ -27,7 +27,7 @@ import random
 from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 # Allow running this script directly without installing the package by adding the
 # repository root to ``sys.path`` when ``app`` cannot be imported normally.
