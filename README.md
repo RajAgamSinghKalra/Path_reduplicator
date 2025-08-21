@@ -99,7 +99,8 @@ automation or scripting.
 ## Environment
 
 Copy `.env.example` to `.env` and adjust Oracle connection and model settings as
-needed.
+needed. Set `ORACLE_VECTOR_TABLESPACE` to an ASSM tablespace (for example,
+`USERS`) so vector columns can be created successfully.
 
 ---
 
