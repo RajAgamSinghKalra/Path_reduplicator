@@ -21,7 +21,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 import pandas as pd
 from tqdm.auto import tqdm
@@ -37,8 +37,13 @@ from app.normalization import canonical_identity_text
 from app.embeddings import embed_identity
 
 
-def _row_to_query(row: pd.Series) -> dict[str, object]:
-    """Return a dictionary of query fields from a customer row."""
+def _row_to_query(row: Mapping[str, object]) -> dict[str, object]:
+    """Return a dictionary of query fields from a customer row.
+
+    ``row`` may be a :class:`pandas.Series` or a plain ``dict`` which allows
+    callers to pre-convert the dataframe to a list of dictionaries for faster
+    iteration.
+    """
 
     dob = row.get("dob")
     if pd.notna(dob):
@@ -58,7 +63,7 @@ def _row_to_query(row: pd.Series) -> dict[str, object]:
     }
 
 
-def _query_vector(row: pd.Series) -> Sequence[float]:
+def _query_vector(row: Mapping[str, object]) -> Sequence[float]:
     """Compute the embedding for ``row`` used to mine hard negatives."""
 
     ident = canonical_identity_text(
@@ -195,17 +200,25 @@ def main(output_path: str = "labeled_pairs.csv", *, chunk_size: int = 10_000) ->
             if len(group) <= 1:
                 continue
 
-            ids = set(int(x) for x in group["customer_id"].tolist())
-            for _, q in group.iterrows():
-                q_fields = _row_to_query(q)
+            records = group.to_dict("records")
+            ids = [int(r["customer_id"]) for r in records]
+            id_set = set(ids)
+            queries = [_row_to_query(r) for r in records]
 
+            for q_fields, row, cid in tqdm(
+                zip(queries, records, ids),
+                total=len(records),
+                desc="Cluster",
+                leave=False,
+            ):
                 # Positive pairs for other members of the cluster
-                others = group[group["customer_id"] != q["customer_id"]]
-                for _, cand in others.iterrows():
+                for cand_id in ids:
+                    if cand_id == cid:
+                        continue
                     pairs.append(
                         q_fields
                         | {
-                            "cand_customer_id": int(cand["customer_id"]),
+                            "cand_customer_id": cand_id,
                             "label": 1,
                         }
                     )
@@ -214,8 +227,8 @@ def main(output_path: str = "labeled_pairs.csv", *, chunk_size: int = 10_000) ->
                         pairs = []
 
                 # Hard negative
-                qvec = _query_vector(q)
-                neg_id = _hard_negative(conn, qvec, ids)
+                qvec = _query_vector(row)
+                neg_id = _hard_negative(conn, qvec, id_set)
                 if neg_id is not None:
                     pairs.append(q_fields | {"cand_customer_id": neg_id, "label": 0})
                     if len(pairs) >= chunk_size:
