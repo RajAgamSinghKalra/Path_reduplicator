@@ -12,6 +12,7 @@ class Config:
     ORACLE_DSN = os.getenv("ORACLE_DSN", "localhost:1521/FREEPDB1")
     ORACLE_USER = os.getenv("ORACLE_USER", "system")  # or face_app
     ORACLE_PASSWORD = os.getenv("ORACLE_PASSWORD", "1123")  # or face_pass
+    ORACLE_VECTOR_TABLESPACE = os.getenv("ORACLE_VECTOR_TABLESPACE", "USERS")
     EMBED_MODEL = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
     TOPK = int(os.getenv("TOPK", "200"))
     THRESHOLD = float(os.getenv("THRESHOLD", "0.82"))
