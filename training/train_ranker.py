@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
+from joblib import Parallel, delayed
 
 # Ensure the repository root is on ``sys.path`` so that the ``app`` package can
 # be imported when running this script directly (``python training/train_ranker.py``).
@@ -17,7 +18,7 @@ from app.features import feature_row
 from app.db import get_conn
 from app.model_store import save_model
 from app.normalization import canonical_identity_text, norm_postal_code
-from app.embeddings import embed_identity
+from app.embeddings import embed_identities
 from app.deduper import candidate_dict
 from app.db import to_vec_array, ensure_query_identity_table
 from training.data_loader import load_dataframe
@@ -64,22 +65,26 @@ def main(pairs_path: str = "labeled_pairs.csv"):
 
     start = time.time()
     df = load_dataframe(pairs_path)
-    X, y = [], []
-    with get_conn() as conn:
-        for _, r in df.iterrows():
-            q = dict(
-                full_name=r["query_full_name"],
-                dob=r.get("query_dob"),
-                phone_e164=r.get("query_phone"),
-                email_norm=r.get("query_email"),
-                gov_id_norm=r.get("query_gov_id"),
-                addr_line=r.get("query_addr"),
-                city=r.get("query_city"),
-                state=r.get("query_state"),
-                postal_code=norm_postal_code(r.get("query_pc")),
-                country=r.get("query_ctry"),
-            )
-            ident = canonical_identity_text(
+
+    # Prepare query dicts and canonical texts for batch embedding
+    records = df.to_dict("records")
+    queries, texts = [], []
+    for r in records:
+        q = dict(
+            full_name=r["query_full_name"],
+            dob=r.get("query_dob"),
+            phone_e164=r.get("query_phone"),
+            email_norm=r.get("query_email"),
+            gov_id_norm=r.get("query_gov_id"),
+            addr_line=r.get("query_addr"),
+            city=r.get("query_city"),
+            state=r.get("query_state"),
+            postal_code=norm_postal_code(r.get("query_pc")),
+            country=r.get("query_ctry"),
+        )
+        queries.append(q)
+        texts.append(
+            canonical_identity_text(
                 q["full_name"],
                 q["dob"],
                 q["phone_e164"],
@@ -91,13 +96,34 @@ def main(pairs_path: str = "labeled_pairs.csv"):
                 q["postal_code"],
                 q["country"],
             )
-            qvec = embed_identity(ident)
+        )
+
+    qvecs = embed_identities(texts)
+
+    def _process(i):
+        r = records[i]
+        q = queries[i]
+        qvec = qvecs[i]
+        with get_conn() as conn:
             cand = fetch_candidate_row(conn, int(r["cand_customer_id"]), qvec)
-            X.append(feature_row(q, cand, cand["vdist"]))
-            y.append(int(r["label"]))
+        return feature_row(q, cand, cand["vdist"]), int(r["label"])
+
+    results = Parallel(n_jobs=os.cpu_count())(
+        delayed(_process)(i) for i in range(len(records))
+    )
+    if results:
+        X, y = zip(*results)
+    else:
+        X, y = [], []
     X_arr = np.asarray(X)
     y_arr = np.asarray(y)
-    model = LogisticRegression(max_iter=1000, class_weight="balanced")
+
+    model = LogisticRegression(
+        max_iter=1000,
+        class_weight="balanced",
+        solver="liblinear",
+        n_jobs=os.cpu_count(),
+    )
     model.fit(X_arr, y_arr)
     save_model(model)
     duration = time.time() - start
