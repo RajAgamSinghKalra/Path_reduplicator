@@ -111,7 +111,11 @@ def stats():
 
 @app.post("/train")
 def train(req: TrainRequest):
-    result = train_ranker(req.data_path)
+    """Trigger model training and handle unexpected errors gracefully."""
+    try:
+        result = train_ranker(req.data_path)
+    except Exception as exc:  # pragma: no cover - defensive programming
+        raise HTTPException(status_code=500, detail=f"Training failed: {exc}") from exc
     return result
 
 @app.post("/dedupe/check")
