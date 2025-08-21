@@ -4,11 +4,12 @@ import os
 import sys
 from pathlib import Path
 
+import math
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from joblib import Parallel, delayed
 import joblib
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from contextlib import contextmanager
 
 
@@ -90,10 +91,17 @@ def main(pairs_path: str | None = None, *, data_path: str | None = None):
     else:
         df = generate_pairs_df(input_path=data_path)
 
-    # Prepare query dicts and canonical texts for batch embedding
-    records = df.to_dict("records")
-    queries, texts = [], []
-    for r in tqdm(records, desc="Preparing queries"):
+    # Prepare query dicts and canonical texts for batch embedding.  Iterating
+    # over the dataframe with ``tqdm`` provides immediate feedback even for very
+    # large datasets where converting to a list would appear to "hang".
+    records: list[dict[str, object]] = []
+    queries: list[dict[str, object]] = []
+    texts: list[str] = []
+    for row in tqdm(
+        df.itertuples(index=False), total=len(df), desc="Preparing queries"
+    ):
+        r = row._asdict()
+        records.append(r)
         q = dict(
             full_name=r["query_full_name"],
             dob=r.get("query_dob"),
@@ -124,7 +132,18 @@ def main(pairs_path: str | None = None, *, data_path: str | None = None):
             )
         )
 
-    qvecs = embed_identities(texts)
+    # Embedding large batches can take a while with no visible progress.  Break
+    # the texts into chunks and show a second progress bar while embedding.
+    def _chunks(seq: list[str], size: int):
+        for i in range(0, len(seq), size):
+            yield seq[i : i + size]
+
+    qvec_list = []
+    chunk_size = 64
+    total_chunks = math.ceil(len(texts) / chunk_size)
+    for chunk in tqdm(_chunks(texts, chunk_size), total=total_chunks, desc="Embedding"):
+        qvec_list.append(embed_identities(chunk))
+    qvecs = np.vstack(qvec_list) if qvec_list else np.empty((0, 512), dtype=np.float32)
 
     def _process(i):
         r = records[i]
