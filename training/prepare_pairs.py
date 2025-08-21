@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 import pandas as pd
+from tqdm.auto import tqdm
 
 # Allow running this script directly without installing the package by adding the
 # repository root to ``sys.path`` when ``app`` cannot be imported normally.
@@ -187,7 +188,10 @@ def main(output_path: str = "labeled_pairs.csv", *, chunk_size: int = 10_000) ->
                 )
                 header_written = True
 
-        for _, group in df.groupby("identity_text"):
+        n_clusters = df["identity_text"].nunique()
+        for _, group in tqdm(
+            df.groupby("identity_text"), total=n_clusters, desc="Generating pairs"
+        ):
             if len(group) <= 1:
                 continue
 
