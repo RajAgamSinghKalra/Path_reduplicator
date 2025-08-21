@@ -1,8 +1,18 @@
 import time
 import uuid
 import os
+import sys
+from pathlib import Path
+
 import numpy as np
 from sklearn.linear_model import LogisticRegression
+
+# Ensure the repository root is on ``sys.path`` so that the ``app`` package can
+# be imported when running this script directly (``python training/train_ranker.py``).
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+
 from app.features import feature_row
 from app.db import get_conn
 from app.model_store import save_model
