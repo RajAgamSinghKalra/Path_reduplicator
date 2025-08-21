@@ -93,7 +93,7 @@ def topk_by_vector(
                VECTOR_DISTANCE(c.identity_vec, q.qvec) AS vdist,
                c.full_name, c.dob, c.phone_e164, c.email_norm, c.gov_id_norm,
                c.addr_line, c.city, c.state, c.postal_code
-        FROM customers c CROSS JOIN q
+        FROM USERS.CUSTOMERS c CROSS JOIN q
         ORDER BY vdist
         FETCH FIRST :k ROWS ONLY
         """

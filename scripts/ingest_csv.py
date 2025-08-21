@@ -17,7 +17,7 @@ def ingest_data(path: str):
     with get_conn() as conn:
         cur = conn.cursor()
         sql = """
-        INSERT INTO customers(
+        INSERT INTO USERS.CUSTOMERS(
             full_name, dob, phone_e164, email_norm, gov_id_norm,
             addr_line, city, state, postal_code, country, identity_text, identity_vec
         ) VALUES (

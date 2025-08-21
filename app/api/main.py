@@ -66,11 +66,11 @@ def metrics():
 def stats():
     """Return basic applicant metrics derived from the database."""
     with get_conn() as conn, conn.cursor() as cur:
-        cur.execute("SELECT COUNT(*) FROM customers")
+        cur.execute("SELECT COUNT(*) FROM USERS.CUSTOMERS")
         total = cur.fetchone()[0] or 0
 
         cur.execute(
-            "SELECT COUNT(*) FROM customers WHERE TRUNC(created_at) = TRUNC(SYSDATE)"
+            "SELECT COUNT(*) FROM USERS.CUSTOMERS WHERE TRUNC(created_at) = TRUNC(SYSDATE)"
         )
         today = cur.fetchone()[0] or 0
 
@@ -78,7 +78,7 @@ def stats():
             """
             SELECT COUNT(*) FROM (
                 SELECT gov_id_norm, COUNT(*) c
-                FROM customers
+                FROM USERS.CUSTOMERS
                 WHERE gov_id_norm IS NOT NULL
                 GROUP BY gov_id_norm
                 HAVING COUNT(*) > 1
@@ -91,7 +91,7 @@ def stats():
             """
             SELECT COUNT(*) FROM (
                 SELECT gov_id_norm, COUNT(*) c
-                FROM customers
+                FROM USERS.CUSTOMERS
                 WHERE gov_id_norm IS NOT NULL
                 GROUP BY gov_id_norm
                 HAVING COUNT(*) >= 5
@@ -167,7 +167,7 @@ def create_customer(cust: Customer):
 
     with get_conn() as conn, conn.cursor() as cur:
         sql = """
-        INSERT INTO customers(
+        INSERT INTO USERS.CUSTOMERS(
             full_name, dob, phone_e164, email_norm, gov_id_norm,
             addr_line, city, state, postal_code, country, identity_text, identity_vec
         ) VALUES (
