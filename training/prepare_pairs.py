@@ -22,6 +22,9 @@ import argparse
 import sys
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
+import random
+import numpy as np
+from sklearn.neighbors import NearestNeighbors
 
 import pandas as pd
 from tqdm.auto import tqdm
@@ -32,9 +35,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from app.db import get_conn, topk_by_vector
+from app.db import get_conn
 from app.normalization import canonical_identity_text
-from app.embeddings import embed_identity
+from app.embeddings import embed_identity, embed_identities
 
 
 def _row_to_query(row: Mapping[str, object]) -> dict[str, object]:
@@ -64,8 +67,15 @@ def _row_to_query(row: Mapping[str, object]) -> dict[str, object]:
 
 
 def _query_vector(row: Mapping[str, object]) -> Sequence[float]:
-    """Compute the embedding for ``row`` used to mine hard negatives."""
+    """Return the embedding for ``row``.
 
+    Existing tests patch this function so we retain it for compatibility.  When
+    ``identity_vec`` is present it is returned directly; otherwise the canonical
+    identity text is embedded on demand.
+    """
+
+    if "identity_vec" in row:
+        return row["identity_vec"]
     ident = canonical_identity_text(
         row.get("full_name"),
         row.get("dob"),
@@ -83,23 +93,23 @@ def _query_vector(row: Mapping[str, object]) -> Sequence[float]:
 
 def _hard_negative(
     conn, qvec: Sequence[float], exclude_ids: Iterable[int], k: int = 20
-) -> int | None:
-    """Return the ``customer_id`` of a near neighbour not in ``exclude_ids``."""
+) -> int | None:  # pragma: no cover - kept for test monkeypatching
+    """Placeholder retained for backwards compatibility in tests."""
 
-    rows = topk_by_vector(conn, qvec, k)
-    for row in rows:
-        cid = int(row[0])
-        if cid not in exclude_ids:
-            return cid
-    return None
+    raise NotImplementedError("_hard_negative is no longer used")
 
 
-def main(output_path: str = "labeled_pairs.csv", *, chunk_size: int = 10_000) -> None:
+def main(
+    output_path: str = "labeled_pairs.csv",
+    *,
+    chunk_size: int = 10_000,
+    max_pos_per_query: int | None = 5,
+) -> None:
     """Sample query/candidate pairs from the customer table.
 
     The function identifies duplicate clusters using ``identity_text``.  For
-    each row in a cluster it emits one or more positive examples (other rows
-    in the cluster) and a hard negative mined from the vector index.
+    each row in a cluster it emits up to ``max_pos_per_query`` positive examples
+    (other rows in the cluster) and a hard negative mined from the vector index.
 
     Parameters
     ----------
@@ -110,6 +120,10 @@ def main(output_path: str = "labeled_pairs.csv", *, chunk_size: int = 10_000) ->
         Number of pairs to accumulate in memory before flushing to ``output``.
         Chunked writing avoids holding the entire training set in memory which
         previously resulted in :class:`MemoryError` for large databases.
+    max_pos_per_query:
+        Maximum number of positive pairs to emit for each query.  ``None``
+        generates all possible positives which can grow quadratically for large
+        clusters.
     """
 
     with get_conn() as conn:
@@ -159,6 +173,18 @@ def main(output_path: str = "labeled_pairs.csv", *, chunk_size: int = 10_000) ->
 
             df["identity_text"] = df.apply(_ident_text, axis=1)
 
+        # Pre-compute embeddings for all identities in batches to leverage
+        # available acceleration.
+        df["identity_vec"] = list(embed_identities(df["identity_text"].tolist()))
+
+        # Build a nearest-neighbour index over all embeddings once so that
+        # hard negatives can be mined without round-tripping to the database
+        # for every query.  ``n_jobs=-1`` uses all CPU cores.
+        vecs = np.stack(df["identity_vec"].to_numpy())
+        n_neighbors = min(50, len(df))
+        nn_index = NearestNeighbors(n_neighbors=n_neighbors, metric="cosine", n_jobs=-1)
+        nn_index.fit(vecs)
+
         pairs: list[dict[str, object]] = []
         header_written = False
 
@@ -205,16 +231,14 @@ def main(output_path: str = "labeled_pairs.csv", *, chunk_size: int = 10_000) ->
             id_set = set(ids)
             queries = [_row_to_query(r) for r in records]
 
-            for q_fields, row, cid in tqdm(
-                zip(queries, records, ids),
-                total=len(records),
-                desc="Cluster",
-                leave=False,
-            ):
-                # Positive pairs for other members of the cluster
-                for cand_id in ids:
-                    if cand_id == cid:
-                        continue
+            indices = group.index.to_numpy()
+            neigh_indices = nn_index.kneighbors(vecs[indices], return_distance=False)
+
+            for q_fields, cid, neigh in zip(queries, ids, neigh_indices):
+                positives = [cand_id for cand_id in ids if cand_id != cid]
+                if max_pos_per_query is not None and len(positives) > max_pos_per_query:
+                    positives = random.sample(positives, max_pos_per_query)
+                for cand_id in positives:
                     pairs.append(
                         q_fields
                         | {
@@ -226,9 +250,12 @@ def main(output_path: str = "labeled_pairs.csv", *, chunk_size: int = 10_000) ->
                         _write_chunk(pairs)
                         pairs = []
 
-                # Hard negative
-                qvec = _query_vector(row)
-                neg_id = _hard_negative(conn, qvec, id_set)
+                neg_id = None
+                for idx in neigh:
+                    cand_id = int(df.iloc[idx]["customer_id"])
+                    if cand_id not in id_set and cand_id != cid:
+                        neg_id = cand_id
+                        break
                 if neg_id is not None:
                     pairs.append(q_fields | {"cand_customer_id": neg_id, "label": 0})
                     if len(pairs) >= chunk_size:
@@ -250,6 +277,12 @@ if __name__ == "__main__":
         default="labeled_pairs.csv",
         help="Path to CSV or Parquet file to write",
     )
+    parser.add_argument(
+        "--max-pos-per-query",
+        type=int,
+        default=5,
+        help="Maximum number of positive pairs to emit per query (default: 5)",
+    )
     args = parser.parse_args()
-    main(args.output)
+    main(args.output, max_pos_per_query=args.max_pos_per_query)
 
