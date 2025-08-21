@@ -57,8 +57,10 @@ export function TrainModelForm() {
     return interval
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (
+    e?: React.FormEvent | React.MouseEvent
+  ) => {
+    e?.preventDefault()
 
     if (!dataPath.trim()) {
       toast({
@@ -190,7 +192,8 @@ export function TrainModelForm() {
             {/* Submit Button */}
             <div className="flex gap-4">
               <Button
-                type="submit"
+                type="button"
+                onClick={handleSubmit}
                 disabled={trainingStatus.isTraining}
                 className="bg-secondary text-secondary-foreground hover:bg-secondary/90"
               >
