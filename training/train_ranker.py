@@ -22,6 +22,7 @@ from app.embeddings import embed_identities
 from app.deduper import candidate_dict
 from app.db import to_vec_array, ensure_query_identity_table
 from training.data_loader import load_dataframe
+from training.prepare_pairs import generate_pairs_df
 
 def fetch_candidate_row(conn, customer_id, qvec):
     # Single candidate's vdist against qvec
@@ -45,26 +46,28 @@ def fetch_candidate_row(conn, customer_id, qvec):
     conn.commit()
     return candidate_dict(row)
 
-def main(pairs_path: str = "labeled_pairs.csv"):
+def main(pairs_path: str | None = None, *, data_path: str | None = None):
     """Train the duplicate detection ranker.
 
-    A number of workshop environments invoke the training endpoint with the
-    default ``labeled_pairs.csv`` path even though the file might not actually
-    exist. Previously this resulted in a ``FileNotFoundError`` bubbling up and
-    producing a 500 error from the API, which meant the Start Training button in
-    the UI appeared to do nothing.  To provide clearer feedback, guard against
-    missing files and return a structured error that the frontend can surface to
-    the user.
+    ``pairs_path`` may point to a pre-generated CSV/Parquet file of labelled
+    query/candidate pairs.  When omitted, pairs are generated on the fly from
+    ``data_path`` (a raw customer dataset) or directly from the database when
+    ``data_path`` is ``None``.
+
+    Supplying a ``pairs_path`` that does not exist returns a structured error
+    which callers can surface to the user.
     """
 
-    if not os.path.exists(pairs_path):
-        return {
-            "success": False,
-            "message": f"Training data not found: {pairs_path}",
-        }
-
     start = time.time()
-    df = load_dataframe(pairs_path)
+    if pairs_path:
+        if not os.path.exists(pairs_path):
+            return {
+                "success": False,
+                "message": f"Training data not found: {pairs_path}",
+            }
+        df = load_dataframe(pairs_path)
+    else:
+        df = generate_pairs_df(input_path=data_path)
 
     # Prepare query dicts and canonical texts for batch embedding
     records = df.to_dict("records")
@@ -79,7 +82,9 @@ def main(pairs_path: str = "labeled_pairs.csv"):
             addr_line=r.get("query_addr"),
             city=r.get("query_city"),
             state=r.get("query_state"),
-            postal_code=norm_postal_code(r.get("query_pc")),
+            postal_code=norm_postal_code(
+                str(r.get("query_pc")) if r.get("query_pc") is not None else None
+            ),
             country=r.get("query_ctry"),
         )
         queries.append(q)
@@ -148,8 +153,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "pairs_path",
         nargs="?",
-        default="labeled_pairs.csv",
-        help="Path to CSV/Parquet file or Hugging Face dataset directory",
+        help="Path to CSV/Parquet file of labelled pairs (optional)",
+    )
+    parser.add_argument(
+        "--data",
+        dest="data_path",
+        help="Raw customer dataset to generate training pairs when no pairs file is provided",
     )
     args = parser.parse_args()
-    main(args.pairs_path)
+    main(args.pairs_path, data_path=args.data_path)
