@@ -27,6 +27,7 @@ import random
 import json
 from concurrent.futures import ThreadPoolExecutor
 
+import math
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -219,14 +220,16 @@ def main(
                    country, identity_text
             FROM USERS.CUSTOMERS
         """
-        if hasattr(conn, "cursor"):
-            with conn.cursor() as cur:
-                cur.execute(sql)
-                rows = cur.fetchall()
-                col_names = [c[0] for c in cur.description]
-            df = pd.DataFrame(rows, columns=col_names)
-        else:  # pragma: no cover - exercised only in tests with DummyConn
-            df = pd.read_sql(sql, conn)
+        with tqdm(total=1, desc="Fetching customers") as pbar:
+            if hasattr(conn, "cursor"):
+                with conn.cursor() as cur:
+                    cur.execute(sql)
+                    rows = cur.fetchall()
+                    col_names = [c[0] for c in cur.description]
+                df = pd.DataFrame(rows, columns=col_names)
+            else:  # pragma: no cover - exercised only in tests with DummyConn
+                df = pd.read_sql(sql, conn)
+            pbar.update()
         try:
             df = df.map(lambda x: x.read() if hasattr(x, "read") else x)
         except AttributeError:  # pragma: no cover - pandas < 2.1
@@ -264,7 +267,22 @@ def main(
             lambda v: json.loads(v) if isinstance(v, str) else v
         )
     else:
-        df["identity_vec"] = list(embed_identities(df["identity_text"].tolist()))
+        texts = df["identity_text"].tolist()
+        chunk_size = 64
+        total_chunks = math.ceil(len(texts) / chunk_size) if texts else 0
+
+        def _chunks(seq: list[str], size: int):
+            for i in range(0, len(seq), size):
+                yield seq[i : i + size]
+
+        vecs: list[list[float]] = []
+        for chunk in tqdm(
+            _chunks(texts, chunk_size),
+            total=total_chunks,
+            desc="Embedding customers",
+        ):
+            vecs.extend(embed_identities(chunk).tolist())
+        df["identity_vec"] = vecs
 
     all_vecs = np.asarray(df["identity_vec"].tolist(), dtype=float)
     all_ids = df["customer_id"].to_numpy()
