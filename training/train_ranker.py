@@ -1,5 +1,6 @@
 import time
 import uuid
+import os
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from app.features import feature_row
@@ -33,6 +34,23 @@ def fetch_candidate_row(conn, customer_id, qvec):
     return candidate_dict(row)
 
 def main(pairs_path: str = "labeled_pairs.csv"):
+    """Train the duplicate detection ranker.
+
+    A number of workshop environments invoke the training endpoint with the
+    default ``labeled_pairs.csv`` path even though the file might not actually
+    exist. Previously this resulted in a ``FileNotFoundError`` bubbling up and
+    producing a 500 error from the API, which meant the Start Training button in
+    the UI appeared to do nothing.  To provide clearer feedback, guard against
+    missing files and return a structured error that the frontend can surface to
+    the user.
+    """
+
+    if not os.path.exists(pairs_path):
+        return {
+            "success": False,
+            "message": f"Training data not found: {pairs_path}",
+        }
+
     start = time.time()
     df = load_dataframe(pairs_path)
     X, y = [], []
@@ -51,8 +69,16 @@ def main(pairs_path: str = "labeled_pairs.csv"):
                 country=r.get("query_ctry"),
             )
             ident = canonical_identity_text(
-                q["full_name"], q["dob"], q["phone_e164"], q["email_norm"], q["gov_id_norm"],
-                q["addr_line"], q["city"], q["state"], q["postal_code"], q["country"]
+                q["full_name"],
+                q["dob"],
+                q["phone_e164"],
+                q["email_norm"],
+                q["gov_id_norm"],
+                q["addr_line"],
+                q["city"],
+                q["state"],
+                q["postal_code"],
+                q["country"],
             )
             qvec = embed_identity(ident)
             cand = fetch_candidate_row(conn, int(r["cand_customer_id"]), qvec)
