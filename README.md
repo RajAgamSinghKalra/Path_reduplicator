@@ -53,7 +53,16 @@ been seen in our system?" and is tuned for KYC/loan workflows.
    python scripts/ingest_csv.py customers.csv
    ```
 
-5. **Check a duplicate** via API or the web UI:
+5. **Generate training pairs** from the ingested customers:
+
+   ```bash
+   python training/prepare_pairs.py --output labeled_pairs.csv
+   ```
+
+   The script samples duplicate and hard-negative pairs and writes them to
+   ``labeled_pairs.csv`` (or a Parquet file if the extension is ``.parquet``).
+
+6. **Check a duplicate** via API or the web UI:
 
    ```bash
    curl -X POST http://localhost:8000/dedupe/check \
@@ -61,7 +70,7 @@ been seen in our system?" and is tuned for KYC/loan workflows.
         -d '{"full_name":"Rohan K.","dob":"1995-11-20","phone":"+91-9876543210"}'
    ```
 
-6. **Train the ranker** once you have labeled pairs:
+7. **Train the ranker** once you have labeled pairs:
 
    ```bash
    python training/train_ranker.py path/to/labeled_pairs
