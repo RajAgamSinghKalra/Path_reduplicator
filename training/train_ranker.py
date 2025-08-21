@@ -7,6 +7,27 @@ from pathlib import Path
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from joblib import Parallel, delayed
+import joblib
+from tqdm import tqdm
+from contextlib import contextmanager
+
+
+@contextmanager
+def tqdm_joblib(tqdm_object):
+    """Context manager to patch joblib to report into ``tqdm`` progress bar."""
+
+    class TqdmBatchCallback(joblib.parallel.BatchCompletionCallBack):
+        def __call__(self, *args, **kwargs):  # pragma: no cover - passthrough
+            tqdm_object.update(n=self.batch_size)
+            return super().__call__(*args, **kwargs)
+
+    old_cb = joblib.parallel.BatchCompletionCallBack
+    joblib.parallel.BatchCompletionCallBack = TqdmBatchCallback
+    try:
+        yield tqdm_object
+    finally:
+        joblib.parallel.BatchCompletionCallBack = old_cb
+        tqdm_object.close()
 
 # Ensure the repository root is on ``sys.path`` so that the ``app`` package can
 # be imported when running this script directly (``python training/train_ranker.py``).
@@ -72,7 +93,7 @@ def main(pairs_path: str | None = None, *, data_path: str | None = None):
     # Prepare query dicts and canonical texts for batch embedding
     records = df.to_dict("records")
     queries, texts = [], []
-    for r in records:
+    for r in tqdm(records, desc="Preparing queries"):
         q = dict(
             full_name=r["query_full_name"],
             dob=r.get("query_dob"),
@@ -113,9 +134,10 @@ def main(pairs_path: str | None = None, *, data_path: str | None = None):
             cand = fetch_candidate_row(conn, int(r["cand_customer_id"]), qvec)
         return feature_row(q, cand, cand["vdist"]), int(r["label"])
 
-    results = Parallel(n_jobs=os.cpu_count())(
-        delayed(_process)(i) for i in range(len(records))
-    )
+    with tqdm_joblib(tqdm(desc="Computing features", total=len(records))):
+        results = Parallel(n_jobs=os.cpu_count())(
+            delayed(_process)(i) for i in range(len(records))
+        )
     if results:
         X, y = zip(*results)
     else:
