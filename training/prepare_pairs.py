@@ -19,9 +19,17 @@ also emit Parquet when the output path ends with ``.parquet``.
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
 from typing import Iterable, Sequence
 
 import pandas as pd
+
+# Allow running this script directly without installing the package by adding the
+# repository root to ``sys.path`` when ``app`` cannot be imported normally.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
 
 from app.db import get_conn, topk_by_vector
 from app.normalization import canonical_identity_text
