@@ -19,11 +19,12 @@ from app.model_store import save_model
 from app.normalization import canonical_identity_text, norm_postal_code
 from app.embeddings import embed_identity
 from app.deduper import candidate_dict
-from app.db import to_vec_array
+from app.db import to_vec_array, ensure_query_identity_table
 from training.data_loader import load_dataframe
 
 def fetch_candidate_row(conn, customer_id, qvec):
     # Single candidate's vdist against qvec
+    ensure_query_identity_table(conn)
     cur = conn.cursor()
     cur.execute("INSERT INTO query_identity(qvec) VALUES (:1)", [to_vec_array(qvec)])
     cur.execute("SELECT qid FROM query_identity ORDER BY qid DESC FETCH FIRST 1 ROWS ONLY")
