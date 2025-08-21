@@ -104,6 +104,27 @@ def main(output_path: str = "labeled_pairs.csv") -> None:
             FROM USERS.CUSTOMERS
         """
         df = pd.read_sql(sql, conn)
+        if "identity_text" not in df.columns:
+            def _ident_text(row: pd.Series) -> str:
+                dob = row.get("dob")
+                if pd.notna(dob):
+                    dob = str(pd.to_datetime(dob).date())
+                else:
+                    dob = None
+                return canonical_identity_text(
+                    row.get("full_name"),
+                    dob,
+                    row.get("phone_e164"),
+                    row.get("email_norm"),
+                    row.get("gov_id_norm"),
+                    row.get("addr_line"),
+                    row.get("city"),
+                    row.get("state"),
+                    row.get("postal_code"),
+                    row.get("country"),
+                )
+
+            df["identity_text"] = df.apply(_ident_text, axis=1)
 
         pairs: list[dict[str, object]] = []
         for _, group in df.groupby("identity_text"):
