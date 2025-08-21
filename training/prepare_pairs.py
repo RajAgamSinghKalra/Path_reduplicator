@@ -142,7 +142,21 @@ def main(
                    country, identity_text
             FROM USERS.CUSTOMERS
         """
-        df = pd.read_sql(sql, conn)
+        # ``pandas.read_sql`` emits a warning with non-SQLAlchemy connections
+        # (such as the ``oracledb`` DB-API connection used here) and may hang on
+        # some versions of the driver.  When the connection exposes a ``cursor``
+        # method, execute the query manually and build the ``DataFrame`` from the
+        # cursor results to avoid these issues.  Test doubles used in the unit
+        # tests do not implement ``cursor`` so we fall back to ``read_sql`` for
+        # compatibility.
+        if hasattr(conn, "cursor"):
+            with conn.cursor() as cur:
+                cur.execute(sql)
+                rows = cur.fetchall()
+                col_names = [c[0] for c in cur.description]
+            df = pd.DataFrame(rows, columns=col_names)
+        else:  # pragma: no cover - exercised only in tests with DummyConn
+            df = pd.read_sql(sql, conn)
         # Oracle returns LOB objects for ``CLOB`` columns which are not directly
         # comparable and cause ``groupby`` to fail with ``TypeError: '<'
         # not supported between instances of 'LOB' and 'LOB'``.  Convert any
