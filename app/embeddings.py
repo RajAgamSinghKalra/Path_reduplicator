@@ -31,3 +31,38 @@ def embed_identity(text: str):
     elif v.shape[0] > 512:
         v = v[:512]
     return v
+
+
+def embed_identities(texts):
+    """Batch version of :func:`embed_identity`.
+
+    Embedding texts one at a time incurs significant overhead because the
+    underlying model cannot leverage efficient batching.  This helper processes
+    an iterable of texts in a single call, allowing the ``SentenceTransformer``
+    to fully utilize available hardware (CPU threads, GPU/DirectML, etc.).
+
+    Parameters
+    ----------
+    texts:
+        Iterable of strings to embed.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of shape ``(len(texts), 512)`` containing float32 embeddings.
+    """
+
+    if not texts:
+        return np.empty((0, 512), dtype=np.float32)
+
+    vecs = get_model().encode(list(texts), normalize_embeddings=True)
+    vecs = np.asarray(vecs, dtype=np.float32)
+
+    # Pad or truncate to the expected dimensionality.
+    if vecs.shape[1] < 512:
+        pad = ((0, 0), (0, 512 - vecs.shape[1]))
+        vecs = np.pad(vecs, pad)
+    elif vecs.shape[1] > 512:
+        vecs = vecs[:, :512]
+
+    return vecs
