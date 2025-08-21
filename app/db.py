@@ -1,20 +1,22 @@
 import array
 from typing import Sequence
 import threading
+import os
 
 import oracledb
 
-# Attempt to initialize the Oracle client in thick mode if available.  If the
-# specified client libraries are not present or the initialization fails for
-# any reason, we fall back to the default thin mode.  This must happen before
-# any connections or pools are created.
-try:  # pragma: no cover - depends on client availability at runtime
-    oracledb.init_oracle_client(
-        lib_dir=r"C:\Users\Agam\Downloads\intern\pathinfotech\face\oracle23ai\dbhomeFree\bin"
-    )
-    print("Thick mode enabled")
-except Exception:  # pragma: no cover - executed when thick mode fails
-    print("Falling back to thin mode")
+# Attempt to initialize the Oracle client in thick mode if a library directory
+# is provided via the ``ORACLE_CLIENT_LIB_DIR`` environment variable. This
+# avoids hard-coded paths and prevents confusing output when the client
+# libraries are absent. If initialization fails we silently fall back to the
+# default thin mode.
+_lib_dir = os.environ.get("ORACLE_CLIENT_LIB_DIR")
+if _lib_dir:  # pragma: no cover - depends on client availability at runtime
+    try:
+        oracledb.init_oracle_client(lib_dir=_lib_dir)
+        print("Thick mode enabled")
+    except Exception:  # pragma: no cover - executed when thick mode fails
+        print(f"Falling back to thin mode (lib_dir={_lib_dir})")
 
 from .config import Config
 
