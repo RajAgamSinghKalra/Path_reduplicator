@@ -56,7 +56,11 @@ been seen in our system?" and is tuned for KYC/loan workflows.
 5. **Generate training pairs** from the ingested customers:
 
    ```bash
+   # read from the database
    python training/prepare_pairs.py --output labeled_pairs.csv
+
+   # or work offline with a CSV/Parquet file
+   python training/prepare_pairs.py --input dataset/sample_customers.csv --output labeled_pairs.csv
    ```
 
    The script samples duplicate and hard-negative pairs and writes them to
