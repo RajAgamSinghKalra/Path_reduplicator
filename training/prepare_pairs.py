@@ -88,12 +88,22 @@ def _hard_negative(
     return None
 
 
-def main(output_path: str = "labeled_pairs.csv") -> None:
+def main(output_path: str = "labeled_pairs.csv", *, chunk_size: int = 10_000) -> None:
     """Sample query/candidate pairs from the customer table.
 
     The function identifies duplicate clusters using ``identity_text``.  For
     each row in a cluster it emits one or more positive examples (other rows
     in the cluster) and a hard negative mined from the vector index.
+
+    Parameters
+    ----------
+    output_path:
+        Destination file to write.  ``.csv`` and ``.parquet`` extensions are
+        recognised.
+    chunk_size:
+        Number of pairs to accumulate in memory before flushing to ``output``.
+        Chunked writing avoids holding the entire training set in memory which
+        previously resulted in :class:`MemoryError` for large databases.
     """
 
     with get_conn() as conn:
@@ -144,6 +154,39 @@ def main(output_path: str = "labeled_pairs.csv") -> None:
             df["identity_text"] = df.apply(_ident_text, axis=1)
 
         pairs: list[dict[str, object]] = []
+        header_written = False
+
+        # ``ParquetWriter`` is used only when writing Parquet so import lazily
+        pq_writer = None
+        if output_path.lower().endswith((".parquet", ".pq")):
+            import pyarrow as pa
+            import pyarrow.parquet as pq
+
+            pq_writer = None
+
+            def _write_chunk(chunk: list[dict[str, object]]) -> None:
+                nonlocal pq_writer
+                if not chunk:
+                    return
+                table = pa.Table.from_pylist(chunk)
+                if pq_writer is None:
+                    pq_writer = pq.ParquetWriter(output_path, table.schema)
+                pq_writer.write_table(table)
+        else:
+            def _write_chunk(chunk: list[dict[str, object]]) -> None:
+                nonlocal header_written
+                if not chunk:
+                    return
+                df_chunk = pd.DataFrame(chunk)
+                mode = "w" if not header_written else "a"
+                df_chunk.to_csv(
+                    output_path,
+                    index=False,
+                    header=not header_written,
+                    mode=mode,
+                )
+                header_written = True
+
         for _, group in df.groupby("identity_text"):
             if len(group) <= 1:
                 continue
@@ -162,18 +205,23 @@ def main(output_path: str = "labeled_pairs.csv") -> None:
                             "label": 1,
                         }
                     )
+                    if len(pairs) >= chunk_size:
+                        _write_chunk(pairs)
+                        pairs = []
 
                 # Hard negative
                 qvec = _query_vector(q)
                 neg_id = _hard_negative(conn, qvec, ids)
                 if neg_id is not None:
                     pairs.append(q_fields | {"cand_customer_id": neg_id, "label": 0})
+                    if len(pairs) >= chunk_size:
+                        _write_chunk(pairs)
+                        pairs = []
 
-        out_df = pd.DataFrame(pairs)
-        if output_path.lower().endswith(('.parquet', '.pq')):
-            out_df.to_parquet(output_path, index=False)
-        else:
-            out_df.to_csv(output_path, index=False)
+        # flush any remaining pairs
+        _write_chunk(pairs)
+        if pq_writer is not None:
+            pq_writer.close()
 
 
 if __name__ == "__main__":
