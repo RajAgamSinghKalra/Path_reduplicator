@@ -40,11 +40,39 @@ from app.features import feature_row
 from app.db import get_conn
 from app.model_store import save_model
 from app.normalization import canonical_identity_text, norm_postal_code
-from app.embeddings import embed_identities
+from app import embeddings
 from app.deduper import candidate_dict
 from app.db import to_vec_array, ensure_query_identity_table
 from training.data_loader import load_dataframe
 from training.prepare_pairs import generate_pairs_df
+
+# Prefer the dGPU (6550m) via DirectML when available.
+try:  # pragma: no cover - directml typically unavailable in CI
+    import torch_directml
+
+    _device = None
+    if hasattr(torch_directml, "device_count"):
+        for i in range(torch_directml.device_count()):
+            name = ""
+            if hasattr(torch_directml, "get_device_name"):
+                try:
+                    name = torch_directml.get_device_name(i).lower()
+                except Exception:  # pragma: no cover - best effort
+                    name = ""
+            if "660m" in name:  # Skip the integrated GPU
+                continue
+            if "6550m" in name:
+                _device = torch_directml.device(i)
+                break
+            if _device is None:
+                _device = torch_directml.device(i)
+    if _device is not None:
+        embeddings._DEVICE = _device
+        embeddings.get_model.cache_clear()
+except Exception:  # pragma: no cover - fall back silently
+    pass
+
+embed_identities = embeddings.embed_identities
 
 def fetch_candidate_row(conn, customer_id, qvec):
     # Single candidate's vdist against qvec
@@ -138,12 +166,36 @@ def main(pairs_path: str | None = None, *, data_path: str | None = None):
         for i in range(0, len(seq), size):
             yield seq[i : i + size]
 
-    qvec_list = []
-    chunk_size = 64
-    total_chunks = math.ceil(len(texts) / chunk_size)
-    for chunk in tqdm(_chunks(texts, chunk_size), total=total_chunks, desc="Embedding"):
-        qvec_list.append(embed_identities(chunk))
-    qvecs = np.vstack(qvec_list) if qvec_list else np.empty((0, 512), dtype=np.float32)
+    # Reuse previously computed embeddings when available and complete.
+    cache_path = (
+        Path(pairs_path).with_suffix(".qvecs.npy")
+        if pairs_path
+        else Path("cached_qvecs.npy")
+    )
+    qvecs = None
+    if cache_path.exists():
+        try:
+            qvecs = np.load(cache_path)
+            if qvecs.shape[0] != len(texts):
+                qvecs = None
+        except Exception:  # pragma: no cover - corrupted cache
+            qvecs = None
+    if qvecs is None:
+        qvec_list = []
+        chunk_size = 64
+        total_chunks = math.ceil(len(texts) / chunk_size)
+        for chunk in tqdm(
+            _chunks(texts, chunk_size), total=total_chunks, desc="Embedding"
+        ):
+            qvec_list.append(embed_identities(chunk))
+        qvecs = (
+            np.vstack(qvec_list)
+            if qvec_list
+            else np.empty((0, 512), dtype=np.float32)
+        )
+        np.save(cache_path, qvecs)
+    else:
+        print(f"Loaded {len(qvecs)} cached embeddings from {cache_path}")
 
     def _process(i):
         r = records[i]
