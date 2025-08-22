@@ -140,6 +140,7 @@ def generate_pairs_df(
     input_path: str | None = None,
     max_pos_per_query: int | None = 5,
     workers: int | None = None,
+    max_pairs: int | None = None,
 ) -> pd.DataFrame:
     """Return a dataframe of query/candidate pairs for training.
 
@@ -158,6 +159,7 @@ def generate_pairs_df(
             input_path=input_path,
             max_pos_per_query=max_pos_per_query,
             workers=workers,
+            max_pairs=max_pairs,
         )
         return pd.read_csv(tmp_path, dtype=str)
     finally:
@@ -174,6 +176,7 @@ def main(
     chunk_size: int = 10_000,
     max_pos_per_query: int | None = 5,
     workers: int | None = None,
+    max_pairs: int | None = None,
 ) -> None:
     """Sample query/candidate pairs from the customer table or a flat file.
 
@@ -201,6 +204,9 @@ def main(
     workers:
         Number of threads for hard-negative mining.  Defaults to the number of
         CPU cores.
+    max_pairs:
+        Optional maximum number of query/candidate pairs to generate.  When
+        provided the function stops once this many pairs have been emitted.
     """
 
     if workers is None:
@@ -289,6 +295,7 @@ def main(
 
     pairs: list[dict[str, object]] = []
     header_written = False
+    total_pairs = 0
 
     # ``ParquetWriter`` is used only when writing Parquet so import lazily
     pq_writer = None
@@ -321,10 +328,11 @@ def main(
             )
             header_written = True
 
-    with tqdm(total=len(df), desc="Generating pairs") as pbar:
+    with tqdm(total=max_pairs if max_pairs is not None else len(df), desc="Generating pairs") as pbar:
         for _, group in df.groupby("identity_text"):
+            if max_pairs is not None and total_pairs >= max_pairs:
+                break
             if len(group) <= 1:
-                pbar.update(len(group))
                 continue
 
             records = group.to_dict("records")
@@ -347,6 +355,8 @@ def main(
                 neg_ids = list(ex.map(_hn, qvecs))
 
             for q_fields, cid, neg_id in zip(queries, ids, neg_ids):
+                if max_pairs is not None and total_pairs >= max_pairs:
+                    break
                 positives = [cand_id for cand_id in ids if cand_id != cid]
                 if (
                     max_pos_per_query is not None
@@ -354,6 +364,8 @@ def main(
                 ):
                     positives = random.sample(positives, max_pos_per_query)
                 for cand_id in positives:
+                    if max_pairs is not None and total_pairs >= max_pairs:
+                        break
                     pairs.append(
                         q_fields
                         | {
@@ -361,19 +373,24 @@ def main(
                             "label": 1,
                         }
                     )
+                    total_pairs += 1
+                    pbar.update(1)
                     if len(pairs) >= chunk_size:
                         _write_chunk(pairs)
                         pairs = []
-
-                if neg_id is not None:
+                if max_pairs is not None and total_pairs >= max_pairs:
+                    break
+                if neg_id is not None and (
+                    max_pairs is None or total_pairs < max_pairs
+                ):
                     pairs.append(
                         q_fields | {"cand_customer_id": neg_id, "label": 0}
                     )
+                    total_pairs += 1
+                    pbar.update(1)
                     if len(pairs) >= chunk_size:
                         _write_chunk(pairs)
                         pairs = []
-
-                pbar.update(1)
 
     # flush any remaining pairs
     _write_chunk(pairs)
@@ -410,11 +427,17 @@ if __name__ == "__main__":
         type=int,
         help="Number of threads for hard-negative mining",
     )
+    parser.add_argument(
+        "--max-pairs",
+        type=int,
+        help="Maximum number of pairs to generate",
+    )
     args = parser.parse_args()
     main(
         args.output,
         input_path=args.input,
         max_pos_per_query=args.max_pos_per_query,
         workers=args.workers,
+        max_pairs=args.max_pairs,
     )
 
