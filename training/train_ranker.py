@@ -96,13 +96,19 @@ def fetch_candidate_row(conn, customer_id, qvec):
     conn.commit()
     return candidate_dict(row)
 
-def main(pairs_path: str | None = None, *, data_path: str | None = None):
+def main(
+    pairs_path: str | None = None,
+    *,
+    data_path: str | None = None,
+    max_pairs: int | None = 3000,
+):
     """Train the duplicate detection ranker.
 
     ``pairs_path`` may point to a pre-generated CSV/Parquet file of labelled
     query/candidate pairs.  When omitted, pairs are generated on the fly from
     ``data_path`` (a raw customer dataset) or directly from the database when
-    ``data_path`` is ``None``.
+    ``data_path`` is ``None``.  ``max_pairs`` limits the number of pairs
+    generated to speed up experiments on large datasets.
 
     Supplying a ``pairs_path`` that does not exist returns a structured error
     which callers can surface to the user.
@@ -117,7 +123,7 @@ def main(pairs_path: str | None = None, *, data_path: str | None = None):
             }
         df = load_dataframe(pairs_path)
     else:
-        df = generate_pairs_df(input_path=data_path)
+        df = generate_pairs_df(input_path=data_path, max_pairs=max_pairs)
 
     # Prepare query dicts and canonical texts for batch embedding.  Iterating
     # over the dataframe with ``tqdm`` provides immediate feedback even for very
@@ -253,5 +259,11 @@ if __name__ == "__main__":
         dest="data_path",
         help="Raw customer dataset to generate training pairs when no pairs file is provided",
     )
+    parser.add_argument(
+        "--max-pairs",
+        type=int,
+        default=3000,
+        help="Maximum number of query/candidate pairs to generate when building training data",
+    )
     args = parser.parse_args()
-    main(args.pairs_path, data_path=args.data_path)
+    main(args.pairs_path, data_path=args.data_path, max_pairs=args.max_pairs)
