@@ -321,53 +321,59 @@ def main(
             )
             header_written = True
 
-    n_clusters = df["identity_text"].nunique()
-    for _, group in tqdm(
-        df.groupby("identity_text"), total=n_clusters, desc="Generating pairs"
-    ):
-        if len(group) <= 1:
-            continue
+    with tqdm(total=len(df), desc="Generating pairs") as pbar:
+        for _, group in df.groupby("identity_text"):
+            if len(group) <= 1:
+                pbar.update(len(group))
+                continue
 
-        records = group.to_dict("records")
-        ids = [int(r["customer_id"]) for r in records]
-        id_set = set(ids)
-        queries = [_row_to_query(r) for r in records]
+            records = group.to_dict("records")
+            ids = [int(r["customer_id"]) for r in records]
+            id_set = set(ids)
+            queries = [_row_to_query(r) for r in records]
 
-        qvecs = [r["identity_vec"] for r in records]
+            qvecs = [r["identity_vec"] for r in records]
 
-        def _hn(v):
-            try:
-                return _hard_negative(
-                    conn, v, id_set, all_vecs=all_vecs, all_ids=all_ids
-                )
-            except TypeError:
-                # Some test stubs don't accept the extra parameters.
-                return _hard_negative(conn, v, id_set)
+            def _hn(v):
+                try:
+                    return _hard_negative(
+                        conn, v, id_set, all_vecs=all_vecs, all_ids=all_ids
+                    )
+                except TypeError:
+                    # Some test stubs don't accept the extra parameters.
+                    return _hard_negative(conn, v, id_set)
 
-        with ThreadPoolExecutor(max_workers=workers) as ex:
-            neg_ids = list(ex.map(_hn, qvecs))
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                neg_ids = list(ex.map(_hn, qvecs))
 
-        for q_fields, cid, neg_id in zip(queries, ids, neg_ids):
-            positives = [cand_id for cand_id in ids if cand_id != cid]
-            if max_pos_per_query is not None and len(positives) > max_pos_per_query:
-                positives = random.sample(positives, max_pos_per_query)
-            for cand_id in positives:
-                pairs.append(
-                    q_fields
-                    | {
-                        "cand_customer_id": cand_id,
-                        "label": 1,
-                    }
-                )
-                if len(pairs) >= chunk_size:
-                    _write_chunk(pairs)
-                    pairs = []
+            for q_fields, cid, neg_id in zip(queries, ids, neg_ids):
+                positives = [cand_id for cand_id in ids if cand_id != cid]
+                if (
+                    max_pos_per_query is not None
+                    and len(positives) > max_pos_per_query
+                ):
+                    positives = random.sample(positives, max_pos_per_query)
+                for cand_id in positives:
+                    pairs.append(
+                        q_fields
+                        | {
+                            "cand_customer_id": cand_id,
+                            "label": 1,
+                        }
+                    )
+                    if len(pairs) >= chunk_size:
+                        _write_chunk(pairs)
+                        pairs = []
 
-            if neg_id is not None:
-                pairs.append(q_fields | {"cand_customer_id": neg_id, "label": 0})
-                if len(pairs) >= chunk_size:
-                    _write_chunk(pairs)
-                    pairs = []
+                if neg_id is not None:
+                    pairs.append(
+                        q_fields | {"cand_customer_id": neg_id, "label": 0}
+                    )
+                    if len(pairs) >= chunk_size:
+                        _write_chunk(pairs)
+                        pairs = []
+
+                pbar.update(1)
 
     # flush any remaining pairs
     _write_chunk(pairs)
